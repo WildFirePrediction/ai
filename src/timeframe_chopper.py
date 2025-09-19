@@ -1,40 +1,49 @@
 import pandas as pd
+import numpy as np
 from datetime import datetime, timedelta
-from macros import *
+from sklearn.cluster import DBSCAN
 from config import *
+from macros import *
 
-def chop_by_cluster_and_time(csv_path: str, time_interval_minutes: int = 60, save_dir: str = None):
+def cluster_big_fires(df, eps_km=2.0, min_samples=3):
     """
-    Chop a clustered VIIRS CSV into separate CSVs by cluster and time interval.
-
-    Parameters:
-        csv_path (str): Path to the original clustered CSV ('cluster' column required).
-        time_interval_minutes (int): Time interval in minutes to chop data.
-        save_dir (str): Directory to save chopped CSVs. If None, saves in same folder as CSV.
+    DBSCAN clustering on big fires using LATITUDE/LONGITUDE
     """
-    df = pd.read_csv(csv_path)
+    coords = np.radians(df[['LATITUDE', 'LONGITUDE']].to_numpy())
+    kms_per_radian = 6371.0088
+    db = DBSCAN(eps=eps_km / kms_per_radian,
+                min_samples=min_samples,
+                algorithm='ball_tree',
+                metric='haversine')
+    db.fit(coords)
+    df['cluster'] = db.labels_
+    return df
 
-    required_cols = {'LATITUDE', 'LONGITUDE', 'cluster', 'ACQ_DATE', 'ACQ_TIME'}
-    if not required_cols.issubset(df.columns):
-        raise ValueError(f"CSV must contain columns: {required_cols}")
+def chop_clusters_by_time(df, time_interval_minutes=60, save_base_dir=None, folder_name=""):
+    """
+    Chop clustered big fires by time intervals and save CSVs
+    """
+    if save_base_dir is None:
+        save_base_dir = os.path.join(os.getcwd(), "chopped")
 
-    df['ACQ_DATETIME'] = pd.to_datetime(
-        df['ACQ_DATE'].astype(str) + df['ACQ_TIME'].astype(str).str.zfill(4),
-        format='%Y-%m-%d%H%M'
-    )
-
-    if save_dir is None:
-        save_dir = os.path.join(os.path.dirname(csv_path), "chopped")
-    os.makedirs(save_dir, exist_ok=True)
-
-    for cluster_id in df['cluster'].unique():
-        cluster_df = df[df['cluster'] == cluster_id]
+    clusters = df['cluster'].unique()
+    for cluster_id in clusters:
         if cluster_id == -1:
             continue
+        cluster_df = df[df['cluster'] == cluster_id]
+
+        cluster_df.loc[:, 'ACQ_DATETIME'] = pd.to_datetime(
+            cluster_df['ACQ_DATE'].astype(str) +
+            cluster_df['ACQ_TIME'].astype(str).str.zfill(4),
+            format='%Y-%m-%d%H%M'
+        )
 
         start_time = cluster_df['ACQ_DATETIME'].min()
         end_time = cluster_df['ACQ_DATETIME'].max()
         interval = timedelta(minutes=time_interval_minutes)
+
+        chopped_dir = os.path.join(save_base_dir, folder_name, f"cluster{cluster_id}")
+        os.makedirs(chopped_dir, exist_ok=True)
 
         current_start = start_time
         while current_start <= end_time:
@@ -45,14 +54,40 @@ def chop_by_cluster_and_time(csv_path: str, time_interval_minutes: int = 60, sav
             ]
             if not timeframe_df.empty:
                 file_name = f"cluster{cluster_id}_{current_start.strftime('%Y%m%d_%H%M')}.csv"
-                save_path = os.path.join(save_dir, file_name)
+                save_path = os.path.join(chopped_dir, file_name)
                 timeframe_df.to_csv(save_path, index=False)
             current_start = current_end
 
+def process_viirs_folder(folder_path, eps_km=2.0, min_samples=3, time_interval_minutes=60):
+    """
+    Process one DL_FIRE folder: merge CSVs, cluster big fires, chop by time
+    """
+    csv_files = [f for f in os.listdir(folder_path) if f.endswith(".csv")]
+    dfs = []
+    for f in csv_files:
+        csv_path = os.path.join(folder_path, f)
+        try:
+            df = pd.read_csv(csv_path)
+            dfs.append(df)
+        except Exception as e:
+            print(e)
+            continue
+
+    if not dfs:
+        return
+
+    merged_df = pd.concat(dfs, ignore_index=True)
+    clustered_df = cluster_big_fires(merged_df, eps_km=eps_km, min_samples=min_samples)
+    chop_clusters_by_time(clustered_df,
+                          time_interval_minutes=time_interval_minutes,
+                          save_base_dir=os.path.join(folder_path, "chopped"),
+                          folder_name="")
+
 if __name__ == "__main__":
-    paths = read_paths(NASA_VIIRS_DATA_DIR)
-    for path in paths:
-        for file_name in os.listdir(path):
-            if file_name.endswith(".csv"):
-                full_csv_path = os.path.join(path, file_name)
-                chop_by_cluster_and_time(full_csv_path, time_interval_minutes=60)
+    dl_fire_dirs = read_paths(NASA_VIIRS_DATA_DIR)
+    for i in range(1):
+        print(f'Processing {dl_fire_dirs[i]}')
+        process_viirs_folder(dl_fire_dirs[i],
+                             eps_km=2.0,
+                             min_samples=3,
+                             time_interval_minutes=60)
