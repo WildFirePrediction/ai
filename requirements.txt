@@ -1,3 +1,5 @@
+numpy
 geopandas
 matplotlib
 folium
+scikit-learn
