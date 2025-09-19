@@ -32,24 +32,4 @@ if __name__=="__main__":
     yearly_paths = read_paths(NASA_VIIRS_DATA_DIR)
     for path in yearly_paths:
         shp_files = fetch_shpfile(path)
-
-        #gdf = gpd.read_file(shp_files[0])
-
         save_to_csv(shp_files[0])
-        """
-
-        plt.figure(figsize=(12, 12))
-        gdf.plot(facecolor='lightblue', edgecolor='black')
-        plt.title("고화질 시각화")
-        plt.show()
-        for shp in shp_files:
-            gdf = gpd.read_file(shp)
-
-            print(gdf.head())
-            print(gdf.columns)
-            print(gdf.crs)
-
-            gdf.plot()
-            plt.title("Shapefile")
-            plt.show()
-        """
