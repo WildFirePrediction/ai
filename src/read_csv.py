@@ -1,5 +1,4 @@
 import csv
-import os
 from config import NASA_DATA_DIR, NASA_VIIRS_DATA_DIR, NASA_MODIS_DATA_DIR
 from macros import *
 
@@ -17,13 +16,3 @@ def read_csv(file_path: str) -> list[dict]:
         for row in reader:
             rows.append(row)
     return rows
-
-if __name__ == "__main__":
-    PATH = NASA_VIIRS_DATA_DIR
-    DIRS = read_paths(PATH)
-
-    for d in DIRS:
-        for file in os.listdir(d):
-            if file.endswith(".csv"):
-                file_path = os.path.join(d, file)
-                data = read_csv(file_path)

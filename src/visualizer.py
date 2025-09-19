@@ -1,7 +1,5 @@
-# visualizer.py
 import folium
 import pandas as pd
-import os
 import random
 from config import NASA_DATA_DIR,NASA_MODIS_DATA_DIR,NASA_VIIRS_DATA_DIR
 from macros import *

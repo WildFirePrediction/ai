@@ -1,5 +1,4 @@
 import geopandas as gpd
-import os
 import glob
 from config import NASA_DATA_DIR, NASA_MODIS_DATA_DIR, NASA_VIIRS_DATA_DIR
 from macros import *

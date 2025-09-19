@@ -1,5 +1,3 @@
-from symbol import file_input
-
 import pandas as pd
 from sklearn.cluster import DBSCAN
 import numpy as np
