@@ -2,7 +2,7 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 import os
 import glob
-from config import NASA_MODIS_DATA_DIR, NASA_VIIRS_DATA_DIR
+from config import NASA_DATA_DIR, NASA_MODIS_DATA_DIR, NASA_VIIRS_DATA_DIR
 
 def fetch_shpfile(yearly_path)->list[str]:
     """ Identify and fetch shapefile paths from given directory path """
@@ -29,7 +29,10 @@ def save_to_csv(shp_path)->None:
     gdf.to_csv(out_path, index=False)
 
 if __name__=="__main__":
-    yearly_paths = read_paths(NASA_VIIRS_DATA_DIR)
+
+    PATH = NASA_VIIRS_DATA_DIR
+
+    yearly_paths = read_paths(PATH)
     for path in yearly_paths:
         shp_files = fetch_shpfile(path)
         save_to_csv(shp_files[0])
