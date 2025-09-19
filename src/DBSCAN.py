@@ -1,7 +1,7 @@
 import pandas as pd
 from sklearn.cluster import DBSCAN
 import numpy as np
-from config import NASA_DATA_DIR, NASA_VIIRS_DATA_DIR, NASA_MODIS_DATA_DIR
+from config import *
 from macros import *
 
 def haversine_distance(lat1, lon1, lat2, lon2):

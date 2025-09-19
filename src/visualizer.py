@@ -1,7 +1,7 @@
 import folium
 import pandas as pd
 import random
-from config import NASA_DATA_DIR,NASA_MODIS_DATA_DIR,NASA_VIIRS_DATA_DIR
+from config import *
 from macros import *
 
 def visualize_clusters(csv_path: str, save_html: str = None, map_center=None, zoom_start=6):

@@ -1,6 +1,6 @@
 import geopandas as gpd
 import glob
-from config import NASA_DATA_DIR, NASA_MODIS_DATA_DIR, NASA_VIIRS_DATA_DIR
+from config import *
 from macros import *
 
 def fetch_shpfile(yearly_path)->list[str]:

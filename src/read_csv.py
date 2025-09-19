@@ -1,5 +1,5 @@
 import csv
-from config import NASA_DATA_DIR, NASA_VIIRS_DATA_DIR, NASA_MODIS_DATA_DIR
+from config import *
 from macros import *
 
 def read_csv(file_path: str) -> list[dict]:
