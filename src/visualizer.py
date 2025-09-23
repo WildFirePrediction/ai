@@ -4,7 +4,7 @@ import random
 from config import *
 from macros import *
 
-def visualize_clusters(csv_path: str, save_html: str = None, map_center=None, zoom_start=6):
+def visualize_clusters(csv_path: str, save_html: str = None, map_center=None, zoom_start=6)->None:
     """
     Visualize clustered VIIRS/산불 points using Folium.
 

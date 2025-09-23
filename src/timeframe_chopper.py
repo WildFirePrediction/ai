@@ -5,7 +5,7 @@ from sklearn.cluster import DBSCAN
 from config import *
 from macros import *
 
-def cluster_big_fires(df, eps_km=2.0, min_samples=3):
+def cluster_big_fires(df, eps_km=2.0, min_samples=3)->pd.DataFrame:
     """
     DBSCAN clustering on big fires using LATITUDE/LONGITUDE
     """
@@ -19,7 +19,7 @@ def cluster_big_fires(df, eps_km=2.0, min_samples=3):
     df['cluster'] = db.labels_
     return df
 
-def chop_clusters_by_time(df, time_interval_minutes=60, save_base_dir=None, folder_name=""):
+def chop_clusters_by_time(df, time_interval_minutes=60, save_base_dir=None, folder_name="")->None:
     """
     Chop clustered big fires by time intervals and save CSVs
     """
@@ -58,7 +58,7 @@ def chop_clusters_by_time(df, time_interval_minutes=60, save_base_dir=None, fold
                 timeframe_df.to_csv(save_path, index=False)
             current_start = current_end
 
-def process_viirs_folder(folder_path, eps_km=2.0, min_samples=3, time_interval_minutes=60):
+def process_viirs_folder(folder_path, eps_km=2.0, min_samples=3, time_interval_minutes=60)->None:
     """
     Process one DL_FIRE folder: merge CSVs, cluster big fires, chop by time
     """

@@ -4,7 +4,7 @@ import numpy as np
 from config import *
 from macros import *
 
-def haversine_distance(lat1, lon1, lat2, lon2):
+def haversine_distance(lat1, lon1, lat2, lon2)->float:
     """Calculate haversine distance (km) between two points """
     R = 6371.0
     lat1, lon1, lat2, lon2 = map(np.radians, [lat1, lon1, lat2, lon2])
@@ -15,7 +15,7 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     return R * c
 
 
-def clustering_all_timeframes(csv_path: str, eps_km: float = 2.0, min_samples: int = 3):
+def clustering_all_timeframes(csv_path: str, eps_km: float = 2.0, min_samples: int = 3)->None:
     """
     Run DBSCAN on a VIIRS CSV using latitude/longitude with haversine distance.
     Save clustered CSV with 'cluster' column added.
