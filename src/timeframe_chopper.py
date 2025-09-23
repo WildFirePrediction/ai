@@ -85,9 +85,9 @@ def process_viirs_folder(folder_path, eps_km=2.0, min_samples=3, time_interval_m
 
 if __name__ == "__main__":
     dl_fire_dirs = read_paths(NASA_VIIRS_DATA_DIR)
-    for i in range(1):
-        print(f'Processing {dl_fire_dirs[i]}')
-        process_viirs_folder(dl_fire_dirs[i],
+    for file in dl_fire_dirs:
+        print(f'Processing {file}')
+        process_viirs_folder(file,
                              eps_km=2.0,
                              min_samples=3,
                              time_interval_minutes=60)
