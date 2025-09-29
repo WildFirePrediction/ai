@@ -42,14 +42,13 @@ def visualize_clusters(csv_path: str, save_html: str = None, map_center=None, zo
 
     if save_html:
         m.save(save_html)
-    return m
 
 if __name__ == '__main__':
-    paths = read_paths(NASA_VIIRS_DATA_DIR)
+    test_dir = os.path.join(NASA_VIIRS_DATA_DIR, "DL_FIRE_20170201-20180201", "chopped")
+    paths = read_paths(test_dir)
     for path in paths:
         for file_name in os.listdir(path):
-            if file_name.startswith("clustered_") and file_name.endswith(".csv"):
+            if file_name.startswith("cluster0") and file_name.endswith(".csv"):
                 full_csv_path = os.path.join(path, file_name)
                 save_html = os.path.join(path, f"{file_name.replace('.csv', '')}_map.html")
-
                 visualize_clusters(full_csv_path, save_html=save_html)
