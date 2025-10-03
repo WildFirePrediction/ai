@@ -2,6 +2,7 @@ venv
 .DS_Store
 .idea
 *.html
+__pycache__
 *.pyc
 
-data/
+data
