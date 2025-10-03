@@ -8,3 +8,4 @@ DBSCAN으로 하나의 화재를 군집화한 후, 군집 기준 적절한 timef
 
 ## RSP (Relative Slope Position)(상대경사위치)
 
+
