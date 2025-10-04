@@ -1,7 +1,7 @@
 import os
 
 """ Directory paths """
-ROOT_DIR = os.path.dirname(os.getcwd())
+ROOT_DIR = os.getcwd()
 SRC_DIR = os.path.join(ROOT_DIR, "src")
 DATA_DIR = os.path.join(ROOT_DIR, "data")
 NASA_DATA_DIR = os.path.join(DATA_DIR, "NASA")
@@ -20,4 +20,3 @@ KMA_ENDPOINTS = {
     3: {"url": KMA_AWS_BASE_URL + f"_lst?authKey={KMA_WEATHER_TOKEN}", "filename": "AWS_temp", "filetype": "csv", "desc": "AWS 초상온도"},
     4: {"url": KMA_AWS_BASE_URL + f"_vis?authKey={KMA_WEATHER_TOKEN}", "filename": "AWS_vis", "filetype": "csv", "desc": "AWS 가시거리"},
 }
-
