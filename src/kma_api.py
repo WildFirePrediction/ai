@@ -10,12 +10,13 @@ from config import KMA_DATA_DIR, KMA_ENDPOINTS
 np.seterr(invalid="ignore", divide="ignore")
 
 
-def get_weather_data(endpoint, out_dir):
+def get_weather_data(endpoint, out_dir, timestamp):
     if endpoint not in KMA_ENDPOINTS:
         print("Wrong choice")
         return
 
     url = KMA_ENDPOINTS[endpoint]["url"]
+    url += f"&tm2={timestamp}"
     filename = KMA_ENDPOINTS[endpoint]["filename"]
     filetype = KMA_ENDPOINTS[endpoint]["filetype"]
 
@@ -25,7 +26,6 @@ def get_weather_data(endpoint, out_dir):
         print(e)
         return
 
-    timestamp = time.strftime("%m%d%H%M%S")
     os.makedirs(out_dir, exist_ok=True)
 
     temp_path = os.path.join(out_dir, f"{filename}.{filetype}")
@@ -40,12 +40,11 @@ def get_weather_data(endpoint, out_dir):
     print(f"saved to : {save_path}")
 
 
-def get_all_weather_data():
-    timestamp = time.strftime("%m%d%H%M%S")
+def get_all_weather_data(timestamp):
     out_dir = os.path.join(KMA_DATA_DIR, timestamp)
     os.makedirs(out_dir, exist_ok=True)
     for endpoint in KMA_ENDPOINTS:
-        get_weather_data(endpoint, out_dir)
+        get_weather_data(endpoint, out_dir, timestamp)
 
 
 def convert_to_csv(infile_path, outfile_path):
