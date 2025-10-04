@@ -4,3 +4,7 @@ geopandas
 matplotlib
 folium
 scikit-learn
+requests
+netCDF4
+pyproj
+datetime
