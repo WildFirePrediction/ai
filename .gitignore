@@ -5,5 +5,5 @@
 *.html
 __pycache__
 *.pyc
-
+.claude
 data
