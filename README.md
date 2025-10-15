@@ -1,12 +1,21 @@
 # Wildfire Data Preconfiguration
 
+(MDP) <S,A,P,R>
+- s \in S, s = (x, y, te, l, w, d, rh, r, i,tm) 
+- a \in A, a = (N, S, E, W, NE, NW, SE, SW, STAY)
+- P: Transition Probability, P(s'|s,a)
+- R: Reward Function, R(s,a,s')
+
 ## 화재 데이터
 
 ### Nasa FIRMS
 
 `VIIRS - 300m X 300m`
 
-DBSCAN으로 하나의 화재를 군집화한 후, 군집 기준 적절한 timeframe(~1일) 으로 chop, timeframe을 비교하며 화재의 확산 데이터 추출
+* x - `LONGITUDE`
+* y - `LATITUDE`
+* te - `BRIGHTNESS`, `BRIGHT_T31`
+* i - `FRP`
 
 ## 정적 데이터
 
@@ -18,6 +27,8 @@ DBSCAN으로 하나의 화재를 군집화한 후, 군집 기준 적절한 timef
 
 ### LCM (Land Cover Map)(토지 피복도)
 
+* l - (water, vegetation, bare land, built up, other)
+
 ### DEM (Digital Elevation Model)(고도)
 
 
@@ -25,4 +36,9 @@ DBSCAN으로 하나의 화재를 군집화한 후, 군집 기준 적절한 timef
 
 ### KMA-AWS (기상청 AWS매분자료)
 
+* w - WS1, WS10 (1분, 10분 평균 풍속)
+* d - WD1, WD10 (1분, 10분 평균 풍향)
+* te - TA (1분 평균 기온)
+* rh - HM (1분 평균 상대습도)
+* r - RN-15m, RN-60m (15분, 60분 평균 강수량)
 
