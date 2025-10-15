@@ -8,6 +8,7 @@ NASA_DATA_DIR = os.path.join(DATA_DIR, "NASA")
 NASA_MODIS_DATA_DIR = os.path.join(NASA_DATA_DIR, "MODIS")
 NASA_VIIRS_DATA_DIR = os.path.join(NASA_DATA_DIR, "VIIRS")
 KMA_DATA_DIR = os.path.join(DATA_DIR, "KMA")
+NDVI_DATA_DIR = os.path.join(DATA_DIR, "NDVI")
 
 """ API KEYS"""
 KMA_WEATHER_TOKEN = os.getenv("KMA_WEATHER_TOKEN")
