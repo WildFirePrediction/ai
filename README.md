@@ -1,4 +1,4 @@
-# Wildfire Spread Prediction using Reinforcement Learning
+# WildFirePrediction 
 
 ## 개요
 
