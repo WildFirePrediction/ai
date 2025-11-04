@@ -7,3 +7,5 @@ __pycache__
 *.pyc
 .claude
 data
+check_layers.py
+get_ndvi.py
