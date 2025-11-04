@@ -10,6 +10,10 @@ NASA_VIIRS_DATA_DIR = os.path.join(NASA_DATA_DIR, "VIIRS")
 KMA_DATA_DIR = os.path.join(DATA_DIR, "KMA")
 NDVI_DATA_DIR = os.path.join(DATA_DIR, "NDVI")
 
+""" Inference data paths """
+INFERENCE_DATA_DIR = os.path.join(DATA_DIR, "inference_data")
+KFS_DATA_DIR = os.path.join(INFERENCE_DATA_DIR, "KFS")
+
 """ API KEYS"""
 KMA_WEATHER_TOKEN = os.getenv("KMA_WEATHER_TOKEN")
 
@@ -21,3 +25,7 @@ KMA_ENDPOINTS = {
     3: {"url": KMA_AWS_BASE_URL + f"_lst?authKey={KMA_WEATHER_TOKEN}", "filename": "AWS_temp", "filetype": "csv", "desc": "AWS 초상온도"},
     4: {"url": KMA_AWS_BASE_URL + f"_vis?authKey={KMA_WEATHER_TOKEN}", "filename": "AWS_vis", "filetype": "csv", "desc": "AWS 가시거리"},
 }
+
+""" KFS API """
+KFS_REALTIME_URL = "https://fd.forest.go.kr/ffas/pubConn/selectPublicFireShowList.do"
+KFS_WARNINGLIST_URL = "https://fd.forest.go.kr/ffas/new/getFireWarningList.do"
