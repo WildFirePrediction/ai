@@ -1,11 +1,11 @@
 import os
 
 """ Directory paths """
-ROOT_DIR = os.getcwd()
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 SRC_DIR = os.path.join(ROOT_DIR, "src")
 DATA_DIR = os.path.join(ROOT_DIR, "data")
-INFERENCE_DATA_DIR = os.path.join(DATA_DIR, "inference_data")
+INFERENCE_DATA_DIR = os.path.join(ROOT_DIR, "inference_data")
 
 NASA_DATA_DIR = os.path.join(DATA_DIR, "NASA")
 NASA_MODIS_DATA_DIR = os.path.join(NASA_DATA_DIR, "MODIS")

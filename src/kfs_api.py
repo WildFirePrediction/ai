@@ -3,7 +3,7 @@ from src.config import KFS_REALTIME_URL, KFS_DATA_DIR, KFS_WARNINGLIST_URL
 import csv
 import os
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 
 def get_kfs_fire_data():
     try:
@@ -89,3 +89,5 @@ def test_kfs_api():
 
 if __name__ == "__main__":
     test_kfs_api()
+    get_kfs_fire_data()
+    get_kfs_warning_data()
