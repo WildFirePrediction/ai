@@ -1,8 +1,8 @@
-# WildFirePrediction 
+# WildFirePrediction-AI
 
 ## 개요
 
-중앙대학교 25-2 캡스톤디자인 프로젝트로 진행되는 "강화학습을 이용한 산불 확산 예측 모델 개발"의 AI 구성 문서입니다.
+중앙대학교 25-2 캡스톤디자인 프로젝트로 진행되는 **산불 확산 예측 서비스 개발**의 AI Repo
 
 ## 강화학습 모델
 ### A3C (Asynchronous Advantage Actor-Critic)
