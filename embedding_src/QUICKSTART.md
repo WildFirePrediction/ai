@@ -38,10 +38,10 @@ chmod +x verify_setup.sh
 ## Step 4: Run the Pipeline
 
 ```bash
-chmod +x run_embedding_pipeline.sh
+chmod +x run_embedding.sh
 
 # Run complete pipeline (takes 1-3 hours)
-./run_embedding_pipeline.sh
+./run_embedding.sh
 ```
 
 **Or run scripts individually:**
