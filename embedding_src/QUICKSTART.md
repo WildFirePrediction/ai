@@ -24,7 +24,8 @@ python3 -m venv venv
 source venv/bin/activate
 
 # Install Python packages
-pip install -r requirements_embedding.txt
+cd .. && pip install -r requirements.txt
+cd embedding_src
 ```
 
 ## Step 3: Verify Data Structure

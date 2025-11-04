@@ -137,7 +137,7 @@ else
     echo "❌ Found $ERRORS error(s). Please fix before running pipeline."
     echo ""
     echo "Common fixes:"
-    echo "  - Install missing dependencies: pip install -r requirements_embedding.txt"
+    echo "  - Install missing dependencies: pip install -r requirements.txt"
     echo "  - Verify data directory structure matches documentation"
     echo "  - Check data files are accessible"
     exit 1

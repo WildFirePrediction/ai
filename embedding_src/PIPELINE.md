@@ -693,7 +693,7 @@ GDAL>=3.6.0           # Geospatial library
 
 **Installation:**
 ```bash
-pip install -r requirements_embedding.txt
+cd .. && pip install -r requirements.txt
 ```
 
 ---
