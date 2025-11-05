@@ -95,18 +95,32 @@ else:
     exit(1)
 
 # ============================================================================
-# 4. ALIGN TO TARGET GRID (400m, EPSG:5179)
+# 4. ALIGN TO TARGET GRID (400m, EPSG:5179) - SOUTH KOREA ONLY
 # ============================================================================
 print("\n[4/5] Aligning to 400m grid (EPSG:5179)...")
 
 target_crs = 'EPSG:5179'
 target_resolution = 400  # meters
 
+# SOUTH KOREA BOUNDS (32.5-39°N, 124-131.5°E)
+# This clips the grid to exclude North Korea
+SOUTH_KOREA_BOUNDS = {
+    'x_min': 670_800,
+    'y_min': 1_395_200,
+    'x_max': 1_346_800,
+    'y_max': 2_118_800
+}
+
+print("\n⚠️  CLIPPING TO SOUTH KOREA BOUNDS ONLY")
+print(f"  X: {SOUTH_KOREA_BOUNDS['x_min']:,} to {SOUTH_KOREA_BOUNDS['x_max']:,} ({(SOUTH_KOREA_BOUNDS['x_max']-SOUTH_KOREA_BOUNDS['x_min'])/1000:.1f} km)")
+print(f"  Y: {SOUTH_KOREA_BOUNDS['y_min']:,} to {SOUTH_KOREA_BOUNDS['y_max']:,} ({(SOUTH_KOREA_BOUNDS['y_max']-SOUTH_KOREA_BOUNDS['y_min'])/1000:.1f} km)")
+print(f"  (Excludes North Korea - DMZ is at Y ≈ 1,450,000)")
+
 # Calculate target transform and dimensions
 # If DEM is not in EPSG:5179, we need to transform its bounds first
 
 if str(dem_crs) != 'EPSG:5179':
-    print(f"DEM CRS ({dem_crs}) differs from target CRS (EPSG:5179)")
+    print(f"\nDEM CRS ({dem_crs}) differs from target CRS (EPSG:5179)")
     print("Calculating transformed bounds...")
 
     # Calculate transform from source to target CRS
@@ -119,10 +133,18 @@ if str(dem_crs) != 'EPSG:5179':
     # Get bounds in target CRS
     west, south, east, north = transform_bounds(dem_crs, target_crs, *dem_bounds)
 
-    print(f"Transformed bounds (EPSG:5179): W={west:.2f}, S={south:.2f}, E={east:.2f}, N={north:.2f}")
+    print(f"Full DEM bounds (EPSG:5179): W={west:.2f}, S={south:.2f}, E={east:.2f}, N={north:.2f}")
 else:
     west, south, east, north = dem_bounds
-    print(f"DEM already in EPSG:5179: W={west:.2f}, S={south:.2f}, E={east:.2f}, N={north:.2f}")
+    print(f"Full DEM bounds (EPSG:5179): W={west:.2f}, S={south:.2f}, E={east:.2f}, N={north:.2f}")
+
+# Clip to South Korea bounds
+west = max(west, SOUTH_KOREA_BOUNDS['x_min'])
+south = max(south, SOUTH_KOREA_BOUNDS['y_min'])
+east = min(east, SOUTH_KOREA_BOUNDS['x_max'])
+north = min(north, SOUTH_KOREA_BOUNDS['y_max'])
+
+print(f"Clipped bounds (South Korea): W={west:.2f}, S={south:.2f}, E={east:.2f}, N={north:.2f}")
 
 # Snap to 400m grid
 x0 = np.floor(west / target_resolution) * target_resolution

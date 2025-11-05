@@ -1,0 +1,8 @@
+{
+  "num_time_periods": 1,
+  "normalization": "range [-1, 1] to [0, 1]",
+  "current_ndvi_mean": 0.19440391659736633,
+  "current_ndvi_std": 0.33945879340171814,
+  "current_ndvi_min": 0.0,
+  "current_ndvi_max": 0.9345962405204773
+}
