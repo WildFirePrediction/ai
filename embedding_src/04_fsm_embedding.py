@@ -3,7 +3,6 @@
 Processes Forest Stand Map (임상도) shapefile data from all provinces
 """
 
-import os
 import numpy as np
 import pandas as pd
 import geopandas as gpd
@@ -12,6 +11,7 @@ from rasterio.features import rasterize
 from rasterio.transform import from_origin
 from pathlib import Path
 import json
+import time
 
 output_dir = Path('../embedded_data')
 output_dir.mkdir(exist_ok=True)
@@ -63,97 +63,145 @@ for d in province_dirs:
 # List all shapefiles
 shp_files = list(fsm_dir.rglob('*.shp'))
 print(f"\nTotal shapefiles: {len(shp_files)}")
+print("Note: Processing in batches to conserve memory...")
 
-# Load and combine shapefiles from all provinces
-gdfs = []
+# ============================================================================
+# 3. IDENTIFY COLUMN NAME FROM SINGLE FILE
+# ============================================================================
+print("\n[3/6] Identifying forest type column from sample file...")
 
-for shp_file in shp_files:
+# Load just ONE file to identify the column
+forest_col = None
+for shp_file in shp_files[:5]:
     try:
         gdf = gpd.read_file(shp_file)
-        # Reproject to target CRS if needed
-        if gdf.crs and gdf.crs != target_crs:
-            gdf = gdf.to_crs(target_crs)
-        gdfs.append(gdf)
-        print(f"  Loaded: {shp_file.parent.name}/{shp_file.name} ({len(gdf)} features)")
-    except Exception as e:
-        print(f"  Error loading {shp_file.name}: {e}")
+        print(f"Available columns: {gdf.columns.tolist()}")
 
-if gdfs:
-    gdf_fsm = pd.concat(gdfs, ignore_index=True)
-    print(f"\nTotal features: {len(gdf_fsm):,}")
-    print(f"CRS: {gdf_fsm.crs}")
-else:
-    print("ERROR: No shapefiles loaded successfully.")
+        # Find columns related to forest type (임상)
+        forest_columns = [
+            col for col in gdf.columns
+            if any(keyword in col.upper() for keyword in ['임상', 'IMSNAG', 'FRST', 'TYPE', 'CLASS', 'KIND'])
+        ]
+
+        print(f"Potential forest type columns: {forest_columns}")
+
+        if forest_columns:
+            forest_col = forest_columns[0]
+        else:
+            # Fallback: use the first non-geometry column
+            forest_col = [col for col in gdf.columns if col != 'geometry'][0]
+
+        print(f"Using forest type column: '{forest_col}'")
+        del gdf  # Free memory immediately
+        break
+    except Exception as e:
+        continue
+
+if not forest_col:
+    print("ERROR: Could not identify forest type column.")
     exit(1)
 
 # ============================================================================
-# 3. IDENTIFY FOREST TYPE CLASSES
+# 4. PROCESS FILES ONE AT A TIME (MEMORY EFFICIENT)
 # ============================================================================
-print("\n[3/6] Identifying forest type classes...")
+print(f"\n[4/6] Processing {len(shp_files)} files ONE AT A TIME (memory efficient)...")
+print("Building type mapping and raster incrementally...")
 
-print(f"Available columns: {gdf_fsm.columns.tolist()}")
+# Initialize empty raster
+fsm_raster = np.zeros((height, width), dtype='uint16')
 
-# Find columns related to forest type (임상)
-forest_columns = [
-    col for col in gdf_fsm.columns
-    if any(keyword in col.upper() for keyword in ['임상', 'IMSNAG', 'FRST', 'TYPE', 'CLASS', 'KIND'])
-]
+# Dynamic type mapping (build as we go)
+type_to_id = {}
+next_id = 1  # 0 reserved for no-data
 
-print(f"Potential forest type columns: {forest_columns}")
+start_time = time.time()
+processed_count = 0
+error_count = 0
 
-if forest_columns:
-    forest_col = forest_columns[0]
-else:
-    # Fallback: use the first non-geometry column
-    forest_col = [col for col in gdf_fsm.columns if col != 'geometry'][0]
+# Process each file individually
+for file_idx, shp_file in enumerate(shp_files):
+    try:
+        # Read only the columns we need
+        gdf = gpd.read_file(shp_file, columns=[forest_col, 'geometry'])
 
-print(f"Using forest type column: '{forest_col}'")
-print(f"\nUnique forest types: {gdf_fsm[forest_col].nunique()}")
-print(gdf_fsm[forest_col].value_counts().head(10))
+        # Reproject if needed
+        if gdf.crs and gdf.crs != target_crs:
+            gdf = gdf.to_crs(target_crs)
+
+        # Add new types to mapping
+        unique_types = gdf[forest_col].dropna().unique()
+        for ftype in unique_types:
+            if ftype not in type_to_id:
+                type_to_id[ftype] = next_id
+                next_id += 1
+
+        # Map to IDs
+        gdf['type_id'] = gdf[forest_col].map(type_to_id).fillna(0).astype(int)
+
+        # Prepare shapes for rasterization
+        shapes = [(geom, value) for geom, value in zip(gdf.geometry, gdf.type_id)
+                  if geom is not None and geom.is_valid]
+
+        if shapes:
+            # Rasterize this file
+            file_raster = rasterize(
+                shapes=shapes,
+                out_shape=(height, width),
+                transform=target_transform,
+                fill=0,
+                dtype='uint16',
+                all_touched=True
+            )
+
+            # Merge with main raster (overwrite where there's data)
+            fsm_raster = np.where(file_raster > 0, file_raster, fsm_raster)
+
+            del file_raster
+
+        # Free memory
+        del gdf, shapes
+        processed_count += 1
+
+        # Progress update every 100 files
+        if (file_idx + 1) % 100 == 0:
+            elapsed = time.time() - start_time
+            rate = (file_idx + 1) / elapsed
+            remaining = (len(shp_files) - file_idx - 1) / rate if rate > 0 else 0
+            coverage = np.count_nonzero(fsm_raster) / fsm_raster.size * 100
+            print(f"  [{file_idx + 1}/{len(shp_files)}] Elapsed: {elapsed/60:.1f}min | ETA: {remaining/60:.1f}min | "
+                  f"Types: {len(type_to_id)} | Coverage: {coverage:.1f}% | Errors: {error_count}")
+
+            # Force garbage collection every 100 files
+            import gc
+            gc.collect()
+
+    except Exception as e:
+        error_count += 1
+        if error_count <= 5:  # Only print first few errors
+            print(f"  Warning: Failed to process {shp_file.name}: {str(e)[:100]}")
+        continue
+
+elapsed_total = time.time() - start_time
+print(f"\nProcessing completed in {elapsed_total/60:.1f} minutes")
+print(f"Successfully processed: {processed_count}/{len(shp_files)} files")
+print(f"Errors: {error_count}")
 
 # ============================================================================
-# 4. CREATE INTEGER ENCODING
+# 5. CREATE FINAL TYPE MAPPING
 # ============================================================================
-print("\n[4/6] Creating integer encoding for forest types...")
+print("\n[5/6] Creating final type mapping...")
 
-unique_types = sorted(gdf_fsm[forest_col].dropna().unique())
-type_to_id = {ftype: idx + 1 for idx, ftype in enumerate(unique_types)}  # Start from 1, 0 for no data
 type_to_id[np.nan] = 0
 id_to_type = {idx: ftype for ftype, idx in type_to_id.items()}
 
-print(f"Number of forest types: {len(unique_types)}")
+print(f"Number of forest types: {len(type_to_id) - 1}")  # -1 for nan
 print(f"\nForest type mapping (first 15):")
 for ftype, idx in list(type_to_id.items())[:15]:
-    print(f"  {ftype} -> {idx}")
-
-# Add integer ID to GeoDataFrame
-gdf_fsm['type_id'] = gdf_fsm[forest_col].map(type_to_id)
-gdf_fsm['type_id'] = gdf_fsm['type_id'].fillna(0).astype(int)
-
-# ============================================================================
-# 5. RASTERIZE TO GRID
-# ============================================================================
-print("\n[5/6] Rasterizing to 400m grid...")
-
-# Prepare shapes for rasterization
-shapes = [(geom, value) for geom, value in zip(gdf_fsm.geometry, gdf_fsm.type_id)
-          if geom is not None and geom.is_valid]
-
-print(f"Rasterizing {len(shapes):,} features to {width}x{height} grid...")
-print("This may take several minutes for large datasets...")
-
-# Rasterize
-fsm_raster = rasterize(
-    shapes=shapes,
-    out_shape=(height, width),
-    transform=target_transform,
-    fill=0,  # Background value for areas without data
-    dtype='uint16',
-    all_touched=True  # Include pixels touched by polygons
-)
+    if pd.notna(ftype):
+        print(f"  {ftype} -> {idx}")
 
 print(f"Rasterization completed")
-print(f"Unique values: {len(np.unique(fsm_raster))}")
+print(f"Unique values in raster: {len(np.unique(fsm_raster))}")
 print(f"Value range: [{fsm_raster.min()}, {fsm_raster.max()}]")
 
 # ============================================================================
@@ -187,7 +235,7 @@ print(f"File size: {output_path.stat().st_size / 1024 / 1024:.2f} MB")
 
 # Save forest type mapping
 type_mapping = {
-    'num_types': len(unique_types) + 1,  # +1 for no-data class
+    'num_types': len(type_to_id),
     'type_to_id': {str(k): int(v) for k, v in type_to_id.items() if pd.notna(k)},
     'id_to_type': {int(k): str(v) for k, v in id_to_type.items() if pd.notna(v)},
     'type_counts': {int(u): int(c) for u, c in zip(*np.unique(fsm_raster, return_counts=True))}
@@ -216,8 +264,8 @@ for idx in sorted_indices[:10]:
 print("\n" + "=" * 80)
 print("FSM EMBEDDING COMPLETE")
 print("=" * 80)
-print(f"✓ Processed {len(gdf_fsm):,} features from {len(province_dirs)} provinces")
-print(f"✓ {len(unique_types)} forest types")
+print(f"✓ Processed {processed_count:,} shapefiles from {len(province_dirs)} provinces")
+print(f"✓ {len(type_to_id) - 1} forest types (excluding no-data)")
 print(f"✓ Rasterized to {width}x{height} grid")
 print(f"✓ Ready for next stage")
 

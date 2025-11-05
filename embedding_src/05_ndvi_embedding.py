@@ -12,6 +12,14 @@ from pathlib import Path
 from datetime import datetime
 import json
 
+# Check if xarray is available for NetCDF files
+try:
+    import xarray as xr
+    HAS_XARRAY = True
+except ImportError:
+    HAS_XARRAY = False
+    print("WARNING: xarray not installed. NetCDF files will be skipped.")
+
 output_dir = Path('../embedded_data')
 output_dir.mkdir(exist_ok=True)
 
@@ -53,44 +61,112 @@ target_transform = from_origin(x0, y1, tile_size, tile_size)
 print("\n[2/5] Loading NDVI data...")
 
 ndvi_dir = Path('../data/NDVI')
-ndvi_files = list(ndvi_dir.glob('*.tif')) + list(ndvi_dir.glob('*.img'))
+ndvi_files = list(ndvi_dir.glob('*.tif')) + list(ndvi_dir.glob('*.img')) + list(ndvi_dir.glob('*.nc'))
 
 print(f"Found {len(ndvi_files)} NDVI files")
 for f in sorted(ndvi_files)[:10]:
     print(f"  - {f.name}")
 
 if not ndvi_files:
-    print("WARNING: No NDVI files found. Creating dummy NDVI data...")
-    ndvi_current = np.random.rand(height, width) * 0.6 + 0.2  # Random values 0.2-0.8
-    ndvi_files_loaded = []
-else:
-    # Load NDVI files and organize by date if temporal information is available
-    ndvi_data_list = []
+    print("ERROR: No NDVI files found in '../data/NDVI'")
+    print("Expected file formats: .tif, .img, .nc")
+    print("Please ensure NDVI data is available before running this embedding.")
+    exit(1)
 
-    for ndvi_file in sorted(ndvi_files)[:10]:  # Limit to first 10 for efficiency
-        try:
+# Load NDVI files and organize by date if temporal information is available
+# Limit to 3 most recent files to conserve memory (64GB system)
+print("Note: Processing only 3 most recent NDVI files to conserve memory...")
+ndvi_data_list = []
+
+for ndvi_file in sorted(ndvi_files)[-3:]:  # Use last 3 files (most recent)
+    try:
+        print(f"  Loading: {ndvi_file.name}...")
+
+        # Handle NetCDF files
+        if ndvi_file.suffix == '.nc':
+            if not HAS_XARRAY:
+                print(f"    Skipping NetCDF file (xarray not installed)")
+                continue
+
+            # Load NetCDF with xarray
+            ds = xr.open_dataset(ndvi_file)
+
+            # Find NDVI variable (common names: NDVI, _250m_16_days_NDVI, etc.)
+            ndvi_var = None
+            for var in ds.data_vars:
+                if 'NDVI' in str(var).upper() or '250m_16_days_NDVI' in str(var):
+                    ndvi_var = var
+                    break
+
+            if ndvi_var is None:
+                print(f"    Error: Could not find NDVI variable in {ndvi_file.name}")
+                print(f"    Available variables: {list(ds.data_vars)}")
+                continue
+
+            print(f"    Using variable: {ndvi_var}")
+
+            # Extract NDVI data (take mean across time if temporal dimension exists)
+            ndvi_data_raw = ds[ndvi_var]
+
+            # Handle time dimension
+            if 'time' in ndvi_data_raw.dims:
+                print(f"    Found time dimension with {len(ndvi_data_raw.time)} timesteps")
+                # Take temporal mean to reduce to 2D
+                ndvi_data = ndvi_data_raw.mean(dim='time').values
+            else:
+                ndvi_data = ndvi_data_raw.values
+
+            # Get spatial info from NetCDF
+            if 'lat' in ds and 'lon' in ds:
+                lats = ds['lat'].values
+                lons = ds['lon'].values
+
+                # Create affine transform from lat/lon
+                from rasterio.transform import from_bounds
+                ndvi_transform = from_bounds(
+                    lons.min(), lats.min(), lons.max(), lats.max(),
+                    ndvi_data.shape[1], ndvi_data.shape[0]
+                )
+                ndvi_crs = 'EPSG:4326'  # WGS84 for lat/lon
+            else:
+                # Fallback: assume some default transform
+                print(f"    Warning: No spatial coordinates found, using default")
+                ndvi_transform = from_origin(0, 0, 250, 250)  # MODIS 250m resolution
+                ndvi_crs = 'EPSG:4326'
+
+            ds.close()
+
+            # MODIS NDVI scale factor (typically scaled by 10000)
+            if ndvi_data.max() > 100:  # Data is likely scaled
+                ndvi_data = ndvi_data / 10000.0
+                print(f"    Applied MODIS scale factor (/ 10000)")
+
+        else:
+            # Handle rasterio-compatible files (GeoTIFF, IMG, etc.)
             with rasterio.open(ndvi_file) as src:
                 ndvi_data = src.read(1)
                 ndvi_transform = src.transform
                 ndvi_crs = src.crs
 
-                # Try to extract date from filename
-                filename = ndvi_file.stem
-                date_str = None
-                # Add date extraction logic if your files have dates in names
+        # Try to extract date from filename
+        filename = ndvi_file.stem
+        date_str = None
+        # Add date extraction logic if your files have dates in names
 
-                ndvi_data_list.append({
-                    'file': ndvi_file,
-                    'data': ndvi_data,
-                    'transform': ndvi_transform,
-                    'crs': ndvi_crs,
-                    'date': date_str
-                })
-                print(f"  Loaded: {ndvi_file.name} - Shape: {ndvi_data.shape}, Range: [{ndvi_data.min():.3f}, {ndvi_data.max():.3f}]")
-        except Exception as e:
-            print(f"  Error loading {ndvi_file.name}: {e}")
+        ndvi_data_list.append({
+            'file': ndvi_file,
+            'data': ndvi_data,
+            'transform': ndvi_transform,
+            'crs': ndvi_crs,
+            'date': date_str
+        })
+        print(f"    Loaded: {ndvi_file.name} - Shape: {ndvi_data.shape}, Range: [{np.nanmin(ndvi_data):.3f}, {np.nanmax(ndvi_data):.3f}]")
+    except Exception as e:
+        print(f"  Error loading {ndvi_file.name}: {e}")
+        import traceback
+        traceback.print_exc()
 
-    ndvi_files_loaded = ndvi_data_list
+ndvi_files_loaded = ndvi_data_list
 
 print(f"\nLoaded {len(ndvi_files_loaded)} NDVI files successfully")
 
@@ -110,67 +186,69 @@ def normalize_ndvi(ndvi_data):
 
     return ndvi_norm
 
-if ndvi_files_loaded:
-    # Normalize all NDVI data
-    for item in ndvi_files_loaded:
-        item['data_norm'] = normalize_ndvi(item['data'])
+# Normalize all NDVI data
+for item in ndvi_files_loaded:
+    item['data_norm'] = normalize_ndvi(item['data'])
 
-    print(f"NDVI normalization completed")
-    print(f"Sample normalized NDVI range: [{ndvi_files_loaded[0]['data_norm'].min():.4f}, {ndvi_files_loaded[0]['data_norm'].max():.4f}]")
-else:
-    # Dummy data already normalized
-    pass
+print(f"NDVI normalization completed")
+print(f"Sample normalized NDVI range: [{ndvi_files_loaded[0]['data_norm'].min():.4f}, {ndvi_files_loaded[0]['data_norm'].max():.4f}]")
 
 # ============================================================================
 # 4. REPROJECT TO TARGET GRID
 # ============================================================================
 print("\n[4/5] Reprojecting to 400m grid...")
 
-if ndvi_files_loaded:
-    # Reproject all NDVI data to target grid
-    for i, item in enumerate(ndvi_files_loaded):
-        print(f"  Reprojecting {item['file'].name}...")
+# Reproject all NDVI data to target grid
+for i, item in enumerate(ndvi_files_loaded):
+    print(f"  Reprojecting {item['file'].name}...")
 
-        ndvi_aligned = np.zeros((height, width), dtype=np.float32)
+    ndvi_aligned = np.zeros((height, width), dtype=np.float32)
 
-        reproject(
-            source=item['data_norm'],
-            destination=ndvi_aligned,
-            src_transform=item['transform'],
-            src_crs=item['crs'],
-            dst_transform=target_transform,
-            dst_crs=target_crs,
-            resampling=Resampling.bilinear
-        )
+    reproject(
+        source=item['data_norm'],
+        destination=ndvi_aligned,
+        src_transform=item['transform'],
+        src_crs=item['crs'],
+        dst_transform=target_transform,
+        dst_crs=target_crs,
+        resampling=Resampling.bilinear
+    )
 
-        item['data_aligned'] = ndvi_aligned
+    item['data_aligned'] = ndvi_aligned
 
-    # Use the most recent NDVI data (or create temporal average)
-    ndvi_current = ndvi_files_loaded[0]['data_aligned']
+    # Free original data to save memory
+    del item['data']
+    del item['data_norm']
 
-    # If multiple files, create temporal average
-    if len(ndvi_files_loaded) > 1:
-        ndvi_stack = np.stack([item['data_aligned'] for item in ndvi_files_loaded])
-        ndvi_mean = np.mean(ndvi_stack, axis=0)
-        ndvi_std = np.std(ndvi_stack, axis=0)
+# Force garbage collection
+import gc
+gc.collect()
 
-        print(f"\nTemporal statistics:")
-        print(f"  Number of time periods: {len(ndvi_files_loaded)}")
-        print(f"  Mean NDVI range: [{ndvi_mean.min():.4f}, {ndvi_mean.max():.4f}]")
-        print(f"  Temporal std range: [{ndvi_std.min():.4f}, {ndvi_std.max():.4f}]")
+# Use the most recent NDVI data (or create temporal average)
+ndvi_current = ndvi_files_loaded[0]['data_aligned']
 
-        # Use mean as current NDVI
-        ndvi_current = ndvi_mean
+# If multiple files, create temporal average
+if len(ndvi_files_loaded) > 1:
+    ndvi_stack = np.stack([item['data_aligned'] for item in ndvi_files_loaded])
+    ndvi_mean = np.mean(ndvi_stack, axis=0)
+    ndvi_std = np.std(ndvi_stack, axis=0)
 
-    print(f"\nCurrent NDVI statistics:")
-    print(f"  Shape: {ndvi_current.shape}")
-    print(f"  Range: [{ndvi_current.min():.4f}, {ndvi_current.max():.4f}]")
-    print(f"  Mean: {ndvi_current.mean():.4f}")
-else:
-    # Using dummy data
-    print("Using dummy NDVI data")
-    print(f"  Shape: {ndvi_current.shape}")
-    print(f"  Range: [{ndvi_current.min():.4f}, {ndvi_current.max():.4f}]")
+    print(f"\nTemporal statistics:")
+    print(f"  Number of time periods: {len(ndvi_files_loaded)}")
+    print(f"  Mean NDVI range: [{ndvi_mean.min():.4f}, {ndvi_mean.max():.4f}]")
+    print(f"  Temporal std range: [{ndvi_std.min():.4f}, {ndvi_std.max():.4f}]")
+
+    # Use mean as current NDVI
+    ndvi_current = ndvi_mean
+
+    # Free stack
+    del ndvi_stack
+    gc.collect()
+
+print(f"\nCurrent NDVI statistics:")
+print(f"  Shape: {ndvi_current.shape}")
+print(f"  Range: [{ndvi_current.min():.4f}, {ndvi_current.max():.4f}]")
+print(f"  Mean: {ndvi_current.mean():.4f}")
 
 # ============================================================================
 # 5. SAVE EMBEDDED DATA

@@ -7,7 +7,7 @@ import os
 import numpy as np
 import rasterio
 from rasterio.transform import from_origin
-from rasterio.warp import reproject, Resampling
+from rasterio.warp import reproject, Resampling, calculate_default_transform, transform_bounds
 from pathlib import Path
 import json
 
@@ -48,12 +48,20 @@ print(f"Elevation range: [{dem_data.min():.2f}, {dem_data.max():.2f}] m")
 # ============================================================================
 print("\n[2/5] Normalizing DEM...")
 
-dem_min = float(dem_data.min())
-dem_max = float(dem_data.max())
+# Mask out nodata values (commonly -9999 or similar)
+nodata_value = dem_meta.get('nodata', -9999)
+valid_mask = dem_data != nodata_value
 
-dem_norm = (dem_data - dem_min) / (dem_max - dem_min)
+dem_min = float(dem_data[valid_mask].min())
+dem_max = float(dem_data[valid_mask].max())
 
-print(f"DEM normalized to range: [{dem_norm.min():.4f}, {dem_norm.max():.4f}]")
+# Normalize only valid data
+dem_norm = np.zeros_like(dem_data, dtype=np.float32)
+dem_norm[valid_mask] = (dem_data[valid_mask] - dem_min) / (dem_max - dem_min)
+dem_norm[~valid_mask] = 0  # Set nodata to 0
+
+print(f"DEM normalized to range: [{dem_norm[valid_mask].min():.4f}, {dem_norm[valid_mask].max():.4f}]")
+print(f"Valid pixels: {valid_mask.sum():,} / {dem_data.size:,}")
 
 # ============================================================================
 # 3. LOAD RSP DATA
@@ -61,7 +69,11 @@ print(f"DEM normalized to range: [{dem_norm.min():.4f}, {dem_norm.max():.4f}]")
 print("\n[3/5] Loading RSP data...")
 
 rsp_dir = Path('../data/RelativeSlopePosition')
-rsp_files = list(rsp_dir.glob('*.tif')) + list(rsp_dir.glob('*.img'))
+# Check in subdirectories as well
+rsp_files = (list(rsp_dir.glob('*.tif')) +
+             list(rsp_dir.glob('*.img')) +
+             list(rsp_dir.glob('**/*.tif')) +
+             list(rsp_dir.glob('**/*.img')))
 
 if rsp_files:
     rsp_path = rsp_files[0]
@@ -77,10 +89,10 @@ if rsp_files:
     print(f"Shape: {rsp_data.shape}")
     print(f"RSP range: [{rsp_data.min():.4f}, {rsp_data.max():.4f}]")
 else:
-    print("WARNING: No RSP files found. Creating dummy RSP data...")
-    rsp_data = np.random.rand(*dem_data.shape)
-    rsp_transform = dem_transform
-    rsp_crs = dem_crs
+    print("ERROR: No RSP files found in '../data/RelativeSlopePosition'")
+    print("Expected to find RSP data files (.tif or .img format)")
+    print("Please ensure RSP data is available before running this embedding.")
+    exit(1)
 
 # ============================================================================
 # 4. ALIGN TO TARGET GRID (400m, EPSG:5179)
@@ -91,7 +103,26 @@ target_crs = 'EPSG:5179'
 target_resolution = 400  # meters
 
 # Calculate target transform and dimensions
-west, south, east, north = dem_bounds
+# If DEM is not in EPSG:5179, we need to transform its bounds first
+
+if str(dem_crs) != 'EPSG:5179':
+    print(f"DEM CRS ({dem_crs}) differs from target CRS (EPSG:5179)")
+    print("Calculating transformed bounds...")
+
+    # Calculate transform from source to target CRS
+    transform, width, height = calculate_default_transform(
+        dem_crs, target_crs,
+        dem_data.shape[1], dem_data.shape[0],
+        *dem_bounds
+    )
+
+    # Get bounds in target CRS
+    west, south, east, north = transform_bounds(dem_crs, target_crs, *dem_bounds)
+
+    print(f"Transformed bounds (EPSG:5179): W={west:.2f}, S={south:.2f}, E={east:.2f}, N={north:.2f}")
+else:
+    west, south, east, north = dem_bounds
+    print(f"DEM already in EPSG:5179: W={west:.2f}, S={south:.2f}, E={east:.2f}, N={north:.2f}")
 
 # Snap to 400m grid
 x0 = np.floor(west / target_resolution) * target_resolution

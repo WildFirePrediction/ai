@@ -7,6 +7,7 @@ __pycache__
 *.pyc
 .claude
 data
+.venv
 src/check_layers.py
 src/get_ndvi.py
 ._*

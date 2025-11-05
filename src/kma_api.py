@@ -5,20 +5,16 @@ import time
 import numpy as np
 import requests
 
-from config import KMA_DATA_DIR, KMA_ENDPOINTS
+from config import KMA_DATA_DIR, KMA_AWS_BASE_URL
 
 np.seterr(invalid="ignore", divide="ignore")
 
 
 def get_weather_data(endpoint, out_dir, timestamp):
-    if endpoint not in KMA_ENDPOINTS:
-        print("Wrong choice")
-        return
-
-    url = KMA_ENDPOINTS[endpoint]["url"]
+    url = endpoint
     url += f"&tm2={timestamp}"
-    filename = KMA_ENDPOINTS[endpoint]["filename"]
-    filetype = KMA_ENDPOINTS[endpoint]["filetype"]
+    filename = "AWS"
+    filetype = "csv"
 
     try:
         response = requests.get(url)
@@ -43,8 +39,7 @@ def get_weather_data(endpoint, out_dir, timestamp):
 def get_all_weather_data(timestamp):
     out_dir = os.path.join(KMA_DATA_DIR, timestamp)
     os.makedirs(out_dir, exist_ok=True)
-    for endpoint in KMA_ENDPOINTS:
-        get_weather_data(endpoint, out_dir, timestamp)
+    get_weather_data(KMA_AWS_BASE_URL, out_dir, timestamp)
 
 
 def convert_to_csv(infile_path, outfile_path):
@@ -95,3 +90,6 @@ def convert_to_csv(infile_path, outfile_path):
             writer.writerow(row)
 
     os.remove(infile_path)
+
+if __name__ == "__main__":
+    get_all_weather_data("201202010340")

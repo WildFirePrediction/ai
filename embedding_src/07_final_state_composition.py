@@ -26,6 +26,7 @@ print("\n[1/5] Loading all embedded data sources...")
 print("\n  [Fire Data]")
 nasa_path = output_dir / 'nasa_viirs_embedded.parquet'
 if nasa_path.exists():
+    print(f"    Loading NASA VIIRS data...")
     df_fire = pd.read_parquet(nasa_path)
     print(f"    ✓ NASA VIIRS: {len(df_fire):,} fire detections")
     print(f"    ✓ Episodes: {df_fire['episode_id'].nunique():,}")
@@ -37,6 +38,7 @@ else:
 print("\n  [Topography]")
 dem_rsp_path = output_dir / 'dem_rsp_embedded.tif'
 if dem_rsp_path.exists():
+    print(f"    Loading DEM/RSP raster...")
     with rasterio.open(dem_rsp_path) as src:
         dem_norm = src.read(1)
         rsp_norm = src.read(2)
@@ -46,8 +48,8 @@ if dem_rsp_path.exists():
             'transform': src.transform,
             'crs': src.crs
         }
-    print(f"    ✓ DEM: {dem_norm.shape}")
-    print(f"    ✓ RSP: {rsp_norm.shape}")
+    print(f"    ✓ DEM: {dem_norm.shape} ({dem_norm.nbytes / 1024 / 1024:.1f}MB)")
+    print(f"    ✓ RSP: {rsp_norm.shape} ({rsp_norm.nbytes / 1024 / 1024:.1f}MB)")
     height, width = dem_norm.shape
 else:
     print(f"    ✗ DEM/RSP data not found")
@@ -60,9 +62,10 @@ print("\n  [Land Cover]")
 lcm_path = output_dir / 'lcm_embedded.tif'
 lcm_mapping_path = output_dir / 'lcm_class_mapping.json'
 if lcm_path.exists():
+    print(f"    Loading LCM raster...")
     with rasterio.open(lcm_path) as src:
         lcm_classes = src.read(1)
-    print(f"    ✓ LCM: {lcm_classes.shape}, {len(np.unique(lcm_classes))} classes")
+    print(f"    ✓ LCM: {lcm_classes.shape}, {len(np.unique(lcm_classes))} classes ({lcm_classes.nbytes / 1024 / 1024:.1f}MB)")
 
     if lcm_mapping_path.exists():
         with open(lcm_mapping_path, 'r') as f:
@@ -78,9 +81,10 @@ print("\n  [Forest Stand]")
 fsm_path = output_dir / 'fsm_embedded.tif'
 fsm_mapping_path = output_dir / 'fsm_class_mapping.json'
 if fsm_path.exists():
+    print(f"    Loading FSM raster...")
     with rasterio.open(fsm_path) as src:
         fsm_classes = src.read(1)
-    print(f"    ✓ FSM: {fsm_classes.shape}, {len(np.unique(fsm_classes))} types")
+    print(f"    ✓ FSM: {fsm_classes.shape}, {len(np.unique(fsm_classes))} types ({fsm_classes.nbytes / 1024 / 1024:.1f}MB)")
 
     if fsm_mapping_path.exists():
         with open(fsm_mapping_path, 'r') as f:
@@ -95,10 +99,11 @@ else:
 print("\n  [Vegetation]")
 ndvi_path = output_dir / 'ndvi_embedded.tif'
 if ndvi_path.exists():
+    print(f"    Loading NDVI raster...")
     with rasterio.open(ndvi_path) as src:
         ndvi_norm = src.read(1)  # Use first band (most recent)
         num_ndvi_bands = src.count
-    print(f"    ✓ NDVI: {ndvi_norm.shape}, {num_ndvi_bands} band(s)")
+    print(f"    ✓ NDVI: {ndvi_norm.shape}, {num_ndvi_bands} band(s) ({ndvi_norm.nbytes / 1024 / 1024:.1f}MB)")
 else:
     print(f"    ✗ NDVI data not found")
     ndvi_norm = None
@@ -107,13 +112,15 @@ else:
 print("\n  [Weather]")
 kma_path = output_dir / 'kma_weather_embedded.tif'
 if kma_path.exists():
+    print(f"    Loading KMA weather raster...")
     with rasterio.open(kma_path) as src:
         w_norm = src.read(1)      # Wind speed
         d_x_norm = src.read(2)    # Wind direction X
         d_y_norm = src.read(3)    # Wind direction Y
         rh_norm = src.read(4)     # Humidity
         r_norm = src.read(5)      # Precipitation
-    print(f"    ✓ KMA: {w_norm.shape}, 5 variables")
+    total_mb = (w_norm.nbytes * 5) / 1024 / 1024
+    print(f"    ✓ KMA: {w_norm.shape}, 5 variables ({total_mb:.1f}MB)")
 else:
     print(f"    ✗ KMA weather data not found")
     w_norm = None
@@ -176,9 +183,16 @@ if w_norm is not None:
 
 # Stack into (C, H, W) tensor
 if continuous_features:
+    print(f"  Stacking {len(continuous_features)} continuous features...")
     state_continuous = np.stack(continuous_features, axis=0).astype(np.float32)
-    print(f"  Continuous state tensor: {state_continuous.shape}")
+    mem_mb = state_continuous.nbytes / 1024 / 1024
+    print(f"  Continuous state tensor: {state_continuous.shape} ({mem_mb:.1f}MB)")
     print(f"  Features ({len(feature_names)}): {feature_names}")
+
+    # Free individual feature arrays
+    del continuous_features
+    import gc
+    gc.collect()
 else:
     print("  ✗ No continuous features available")
     state_continuous = None

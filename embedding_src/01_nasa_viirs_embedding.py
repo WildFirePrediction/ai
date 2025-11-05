@@ -38,12 +38,23 @@ for f in csv_files[:3]:
 dfs = []
 for csv_file in tqdm(csv_files, desc="Loading CSV files"):
     try:
-        # Clustered files have no header, last column is cluster_id
-        df = pd.read_csv(csv_file, header=None, names=[
-            'LATITUDE', 'LONGITUDE', 'BRIGHTNESS', 'SCAN', 'TRACK',
-            'ACQ_DATE', 'ACQ_TIME', 'SATELLITE', 'INSTRUMENT', 'CONFIDENCE',
-            'VERSION', 'BRIGHT_T31', 'FRP', 'DAYNIGHT', 'TYPE', 'geometry', 'CLUSTER_ID'
-        ])
+        # Clustered files may have header row, check first line
+        with open(csv_file, 'r') as f:
+            first_line = f.readline().strip()
+
+        # If first line contains column names, skip it
+        if 'LATITUDE' in first_line.upper() or 'latitude' in first_line.lower():
+            df = pd.read_csv(csv_file, skiprows=1, header=None, names=[
+                'LATITUDE', 'LONGITUDE', 'BRIGHTNESS', 'SCAN', 'TRACK',
+                'ACQ_DATE', 'ACQ_TIME', 'SATELLITE', 'INSTRUMENT', 'CONFIDENCE',
+                'VERSION', 'BRIGHT_T31', 'FRP', 'DAYNIGHT', 'TYPE', 'geometry', 'CLUSTER_ID'
+            ])
+        else:
+            df = pd.read_csv(csv_file, header=None, names=[
+                'LATITUDE', 'LONGITUDE', 'BRIGHTNESS', 'SCAN', 'TRACK',
+                'ACQ_DATE', 'ACQ_TIME', 'SATELLITE', 'INSTRUMENT', 'CONFIDENCE',
+                'VERSION', 'BRIGHT_T31', 'FRP', 'DAYNIGHT', 'TYPE', 'geometry', 'CLUSTER_ID'
+            ])
         dfs.append(df)
     except Exception as e:
         print(f"Error loading {csv_file.name}: {e}")
@@ -73,12 +84,11 @@ print(f"Removed {len(df_raw) - len(df_filtered):,} low confidence records")
 # ============================================================================
 print("\n[3/8] Transforming coordinates to EPSG:5179...")
 
-proj_src = pyproj.Proj("EPSG:4326")  # WGS84
-proj_dst = pyproj.Proj("EPSG:5179")  # Korean TM
+# Use modern Transformer API (not deprecated transform)
+transformer = pyproj.Transformer.from_crs("EPSG:4326", "EPSG:5179", always_xy=True)
 
-x, y = pyproj.transform(
-    proj_src,
-    proj_dst,
+# Transform lon, lat to x, y
+x, y = transformer.transform(
     df_filtered['LONGITUDE'].values,
     df_filtered['LATITUDE'].values
 )
