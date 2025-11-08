@@ -1,0 +1,36 @@
+================================================================================
+DATASET SPLITTING (PER-EPISODE)
+================================================================================
+
+[1/4] Loading environment manifest...
+  Environments: 2374
+  Episodes meta: 2686
+
+[2/4] Building stratification key...
+  Unique strata: 8
+
+[3/4] Performing stratified split...
+  Train: 1661 Val: 356 Test: 357
+
+Summary:
+{
+  "total_envs": 2374,
+  "train": 1661,
+  "val": 356,
+  "test": 357,
+  "method": "stratified",
+  "strata": [
+    "large_long",
+    "small_medium",
+    "medium_long",
+    "small_long",
+    "medium_short",
+    "small_short",
+    "medium_medium",
+    "large_medium"
+  ]
+}
+
+================================================================================
+DATASET SPLITTING COMPLETE
+================================================================================

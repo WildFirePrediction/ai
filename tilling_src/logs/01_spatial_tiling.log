@@ -1,0 +1,29 @@
+================================================================================
+EPISODE REGION EXTRACTION
+================================================================================
+
+[1/5] Loading embedded data & metadata...
+  Grid size: 1645 x 1710 cells (400m resolution)
+  Episodes available: 2686
+  Fire detections: 115,799
+
+[2/5] Computing episode regions (extent + padding)...
+  Episodes:   0%|          | 0/2686 [00:00<?, ?it/s]  Episodes:  34%|███▍      | 915/2686 [00:00<00:00, 9149.35it/s]  Episodes:  68%|██████▊   | 1830/2686 [00:00<00:00, 8835.64it/s]  Episodes: 100%|██████████| 2686/2686 [00:00<00:00, 8639.82it/s]
+  Regions computed: 2686
+
+[3/5] Saving static cropped arrays per episode...
+  Saving regions:   0%|          | 0/2686 [00:00<?, ?it/s]  Saving regions:  18%|█▊        | 474/2686 [00:00<00:00, 4736.14it/s]  Saving regions:  36%|███▌      | 961/2686 [00:00<00:00, 4809.74it/s]  Saving regions:  54%|█████▍    | 1451/2686 [00:00<00:00, 4848.00it/s]  Saving regions:  72%|███████▏  | 1937/2686 [00:00<00:00, 4851.27it/s]  Saving regions:  90%|█████████ | 2423/2686 [00:00<00:00, 4826.25it/s]  Saving regions: 100%|██████████| 2686/2686 [00:00<00:00, 4772.47it/s]
+
+[4/5] Writing region index parquet...
+  Saved: /home/chaseungjoon/code/WildfirePrediction-SSD/tilling_data/episode_regions.parquet
+
+[5/5] Summary
+  Episodes processed: 2686
+  Mean region size (cells): 12.9 x 12.9
+  Mean detections per episode: 39.4
+  Mean duration hours: 560.2
+  Saved summary: /home/chaseungjoon/code/WildfirePrediction-SSD/tilling_data/episode_region_summary.json
+
+================================================================================
+EPISODE REGION EXTRACTION COMPLETE
+================================================================================

@@ -1,0 +1,18 @@
+================================================================================
+ENVIRONMENT ASSEMBLY (PER-EPISODE)
+================================================================================
+
+[1/4] Loading static crops and sequences...
+  Regions: 2686 | Sequences: 2374
+
+[2/4] Building environments...
+  Episodes:   0%|          | 0/2374 [00:00<?, ?it/s]  Episodes:   4%|▍         | 96/2374 [00:00<00:02, 810.53it/s]  Episodes:   8%|▊         | 186/2374 [00:00<00:02, 850.43it/s]  Episodes:  12%|█▏        | 284/2374 [00:00<00:02, 836.34it/s]  Episodes:  16%|█▌        | 375/2374 [00:00<00:02, 862.11it/s]  Episodes:  20%|█▉        | 470/2374 [00:00<00:02, 890.66it/s]  Episodes:  25%|██▍       | 588/2374 [00:00<00:01, 984.47it/s]  Episodes:  29%|██▉       | 690/2374 [00:00<00:01, 970.04it/s]  Episodes:  34%|███▍      | 802/2374 [00:00<00:01, 1006.30it/s]  Episodes:  38%|███▊      | 903/2374 [00:00<00:01, 962.17it/s]   Episodes:  42%|████▏     | 1000/2374 [00:01<00:01, 904.33it/s]  Episodes:  47%|████▋     | 1113/2374 [00:01<00:01, 967.73it/s]  Episodes:  51%|█████     | 1211/2374 [00:01<00:01, 913.98it/s]  Episodes:  56%|█████▌    | 1333/2374 [00:01<00:01, 975.12it/s]  Episodes:  60%|██████    | 1432/2374 [00:01<00:00, 943.16it/s]  Episodes:  64%|██████▍   | 1528/2374 [00:01<00:00, 871.37it/s]  Episodes:  70%|██████▉   | 1655/2374 [00:01<00:00, 976.10it/s]  Episodes:  74%|███████▍  | 1755/2374 [00:01<00:00, 947.81it/s]  Episodes:  79%|███████▊  | 1869/2374 [00:01<00:00, 1000.16it/s]  Episodes:  84%|████████▎ | 1985/2374 [00:02<00:00, 1044.13it/s]  Episodes:  88%|████████▊ | 2091/2374 [00:02<00:00, 1048.67it/s]  Episodes:  93%|█████████▎| 2197/2374 [00:02<00:00, 1046.19it/s]  Episodes:  97%|█████████▋| 2303/2374 [00:02<00:00, 1047.73it/s]  Episodes: 100%|██████████| 2374/2374 [00:02<00:00, 970.32it/s] 
+  ✓ Environments built: 2374
+
+[3/4] Saving manifest and summary...
+  Saved manifest: /home/chaseungjoon/code/WildfirePrediction-SSD/tilling_data/environments/environment_manifest.parquet
+  Saved summary: /home/chaseungjoon/code/WildfirePrediction-SSD/tilling_data/environment_assembly_summary.json
+
+================================================================================
+ENVIRONMENT ASSEMBLY COMPLETE (PER-EPISODE)
+================================================================================
