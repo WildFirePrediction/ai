@@ -1,5 +1,5 @@
 import requests
-from src.config import KFS_REALTIME_URL, KFS_DATA_DIR, KFS_WARNINGLIST_URL
+from config import KFS_REALTIME_URL, KFS_DATA_DIR, KFS_WARNINGLIST_URL
 import csv
 import os
 import json

@@ -1,0 +1,87 @@
+{
+  "passed": [
+    "All data files loaded successfully",
+    "Fire coordinates within South Korea bounds",
+    "All grids aligned: (1710, 1645)",
+    "Fire temperature range OK: (np.float64(-27.609999999999985), np.float64(86.28000000000003))",
+    "Wind direction components in valid range [-1, 1]",
+    "Precipitation values non-negative",
+    "DEM range OK: (np.float32(0.0), np.float32(0.69561034))",
+    "RSP in valid range [0, 1]",
+    "NDVI in valid range",
+    "All required columns present",
+    "No missing values in required columns",
+    "Episode sizes reasonable (2 with <3 detections)",
+    "Normalization applied to all features",
+    "Validation visualizations created"
+  ],
+  "warnings": [
+    "Episode -1: gap of 779 hours",
+    "Episode 0: gap of 720 hours",
+    "Episode 1: gap of 8759 hours",
+    "Episode 2: gap of 791 hours",
+    "Episode 4: gap of 850 hours",
+    "Episode 3: gap of 1199 hours",
+    "Episode 5: gap of 1151 hours",
+    "Episode 6: gap of 8748 hours",
+    "Episode 7: gap of 2160 hours",
+    "Episode 8: gap of 4416 hours"
+  ],
+  "failed": [],
+  "stats": {
+    "grid_shape": [
+      1710,
+      1645
+    ],
+    "fire_bounds": {
+      "x": [
+        750099.5922918441,
+        1300795.8214001711
+      ],
+      "y": [
+        1469218.9506605729,
+        2068773.7898444831
+      ]
+    },
+    "value_ranges": {
+      "fire_temp": [
+        -27.609999999999985,
+        86.28000000000003
+      ],
+      "wind_speed": [
+        0.0,
+        19.3064900010818
+      ],
+      "humidity": [
+        0.8040049063837962,
+        99.95630244670518
+      ],
+      "precipitation": [
+        0.0,
+        378.688385089427
+      ],
+      "dem": [
+        0.0,
+        0.6956103444099426
+      ],
+      "rsp": [
+        NaN,
+        NaN
+      ],
+      "ndvi": [
+        0.0,
+        0.9345962405204773
+      ]
+    },
+    "time_range": [
+      "2012-02-01 03:43:00",
+      "2025-06-30 17:32:00"
+    ],
+    "episodes": {
+      "total": 130,
+      "detections_mean": 890.7615384615384,
+      "duration_mean_hours": 91021.8326923077,
+      "spatial_extent_mean_km": 422.6477111186491
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "width": 1645,
+  "height": 1710,
+  "tile_size": 400,
+  "crs": "EPSG:5179",
+  "transform": [
+    400.0,
+    0.0,
+    688800.0,
+    0.0,
+    -400.0,
+    2118800.0
+  ],
+  "num_continuous_features": 3,
+  "continuous_feature_names": [
+    "dem_norm",
+    "rsp_norm",
+    "ndvi_norm"
+  ],
+  "categorical_features": {
+    "lcm": {
+      "num_classes": 8,
+      "embedding_dim_recommended": 16
+    },
+    "fsm": {
+      "num_classes": 4,
+      "embedding_dim_recommended": 16
+    }
+  }
+}

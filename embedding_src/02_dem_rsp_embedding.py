@@ -177,7 +177,7 @@ reproject(
 print(f"DEM reprojected: {dem_aligned.shape}, range [{dem_aligned.min():.4f}, {dem_aligned.max():.4f}]")
 
 # Reproject RSP
-rsp_aligned = np.zeros((height, width), dtype=np.float32)
+rsp_aligned = np.full((height, width), np.nan, dtype=np.float32)
 reproject(
     source=rsp_data,
     destination=rsp_aligned,
@@ -185,10 +185,16 @@ reproject(
     src_crs=rsp_crs if 'rsp_crs' in locals() else dem_crs,
     dst_transform=target_transform,
     dst_crs=target_crs,
-    resampling=Resampling.bilinear
+    resampling=Resampling.bilinear,
+    src_nodata=-99999,
+    dst_nodata=np.nan
 )
 
-print(f"RSP reprojected: {rsp_aligned.shape}, range [{rsp_aligned.min():.4f}, {rsp_aligned.max():.4f}]")
+# Clip RSP to valid range [0, 1]
+rsp_aligned = np.clip(rsp_aligned, 0, 1)
+
+print(f"RSP reprojected: {rsp_aligned.shape}, range [{np.nanmin(rsp_aligned):.4f}, {np.nanmax(rsp_aligned):.4f}]")
+print(f"  NaN pixels: {np.isnan(rsp_aligned).sum()}")
 
 # ============================================================================
 # 5. SAVE EMBEDDED DATA
@@ -208,7 +214,8 @@ output_meta = {
     'compress': 'lzw',
     'tiled': True,
     'blockxsize': 256,
-    'blockysize': 256
+    'blockysize': 256,
+    'nodata': np.nan
 }
 
 with rasterio.open(output_path, 'w', **output_meta) as dst:

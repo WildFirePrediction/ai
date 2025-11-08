@@ -4,13 +4,16 @@ Combines all embedded data sources into final state vectors for RL training
 """
 
 import os
+import sys
 import numpy as np
 import pandas as pd
 import rasterio
 import json
 from pathlib import Path
 
-output_dir = Path('../embedded_data')
+# Handle path regardless of where script is run from
+script_dir = Path(__file__).parent
+output_dir = script_dir.parent / 'embedded_data'
 output_dir.mkdir(exist_ok=True)
 
 print("=" * 80)
@@ -22,17 +25,26 @@ print("=" * 80)
 # ============================================================================
 print("\n[1/5] Loading all embedded data sources...")
 
-# Load fire data
+# Load fire data (with weather)
 print("\n  [Fire Data]")
-nasa_path = output_dir / 'nasa_viirs_embedded.parquet'
+nasa_path = output_dir / 'nasa_viirs_with_weather.parquet'
 if nasa_path.exists():
-    print(f"    Loading NASA VIIRS data...")
+    print(f"    Loading NASA VIIRS + Weather data...")
     df_fire = pd.read_parquet(nasa_path)
-    print(f"    ✓ NASA VIIRS: {len(df_fire):,} fire detections")
+    print(f"    ✓ NASA VIIRS + Weather: {len(df_fire):,} fire detections")
     print(f"    ✓ Episodes: {df_fire['episode_id'].nunique():,}")
+    print(f"    ✓ Includes temporal weather: w, d_x, d_y, rh, r")
 else:
-    print(f"    ✗ NASA VIIRS data not found")
-    df_fire = None
+    # Fallback to old version
+    nasa_path_old = output_dir / 'nasa_viirs_embedded.parquet'
+    if nasa_path_old.exists():
+        print(f"    Loading NASA VIIRS data (without weather)...")
+        df_fire = pd.read_parquet(nasa_path_old)
+        print(f"    ✓ NASA VIIRS: {len(df_fire):,} fire detections")
+        print(f"    ✓ Episodes: {df_fire['episode_id'].nunique():,}")
+    else:
+        print(f"    ✗ NASA VIIRS data not found")
+        df_fire = None
 
 # Load DEM/RSP
 print("\n  [Topography]")
@@ -108,22 +120,12 @@ else:
     print(f"    ✗ NDVI data not found")
     ndvi_norm = None
 
-# Load weather data
+# Weather data (now per-detection, not a static grid)
 print("\n  [Weather]")
-kma_path = output_dir / 'kma_weather_embedded.tif'
-if kma_path.exists():
-    print(f"    Loading KMA weather raster...")
-    with rasterio.open(kma_path) as src:
-        w_norm = src.read(1)      # Wind speed
-        d_x_norm = src.read(2)    # Wind direction X
-        d_y_norm = src.read(3)    # Wind direction Y
-        rh_norm = src.read(4)     # Humidity
-        r_norm = src.read(5)      # Precipitation
-    total_mb = (w_norm.nbytes * 5) / 1024 / 1024
-    print(f"    ✓ KMA: {w_norm.shape}, 5 variables ({total_mb:.1f}MB)")
-else:
-    print(f"    ✗ KMA weather data not found")
-    w_norm = None
+print(f"    ℹ️  Weather is temporal (per fire detection)")
+print(f"    ℹ️  Loaded with fire data in nasa_viirs_with_weather.parquet")
+print(f"    ℹ️  Not creating static weather grid")
+w_norm = None  # Weather handled per-detection now
 
 # ============================================================================
 # 2. VERIFY DATA ALIGNMENT
@@ -177,9 +179,8 @@ if ndvi_norm is not None:
     continuous_features.append(ndvi_norm)
     feature_names.append('ndvi_norm')
 
-if w_norm is not None:
-    continuous_features.extend([w_norm, d_x_norm, d_y_norm, rh_norm, r_norm])
-    feature_names.extend(['w_norm', 'd_x_norm', 'd_y_norm', 'rh_norm', 'r_norm'])
+# Weather is now per-detection (not static grid), so skip here
+# Weather will be added during tiling when creating temporal sequences
 
 # Stack into (C, H, W) tensor
 if continuous_features:
