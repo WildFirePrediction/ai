@@ -172,7 +172,7 @@ def evaluate(model, dataloader, device):
 
 def main():
     parser = argparse.ArgumentParser(description='U-Net Training for Fire Spread')
-    parser.add_argument('--repo-root', type=str, default='/home/chaseungjoon/code/WildfirePrediction-SSD')
+    parser.add_argument('--repo-root', type=str, default='/home/chaseungjoon/code/WildfirePrediction')
     parser.add_argument('--batch-size', type=int, default=4)
     parser.add_argument('--epochs', type=int, default=50)
     parser.add_argument('--lr', type=float, default=1e-4)

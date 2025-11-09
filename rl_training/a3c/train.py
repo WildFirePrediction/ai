@@ -30,7 +30,7 @@ from a3c.worker import worker_process
 
 def main():
     parser = argparse.ArgumentParser(description='A3C Training for Wildfire Prediction')
-    parser.add_argument('--repo-root', type=str, default='/home/chaseungjoon/code/WildfirePrediction-SSD')
+    parser.add_argument('--repo-root', type=str, default='/home/chaseungjoon/code/WildfirePrediction')
     parser.add_argument('--num-workers', type=int, default=4, help='Number of parallel CPU workers')
     parser.add_argument('--max-episodes', type=int, default=1000, help='Total episodes across all workers')
     parser.add_argument('--max-steps', type=int, default=50, help='Max steps per episode')

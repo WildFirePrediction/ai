@@ -8,7 +8,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from rl_training.wildfire_env_spatial import WildfireEnvSpatial
 
-env_file = Path('/home/chaseungjoon/code/WildfirePrediction-SSD/tilling_data/environments/env_00000.pkl')
+env_file = Path('//tilling_data/environments/env_00000.pkl')
 
 # Load raw data
 with open(env_file, 'rb') as f:
@@ -105,7 +105,7 @@ print("=" * 60)
 all_rewards = []
 all_obs_stats = []
 for i in range(1, 11):
-    env_file = Path(f'/home/chaseungjoon/code/WildfirePrediction-SSD/tilling_data/environments/env_{i:05d}.pkl')
+    env_file = Path(f'//tilling_data/environments/env_{i:05d}.pkl')
     env = WildfireEnvSpatial(env_file)
     obs, _ = env.reset()
 

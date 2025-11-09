@@ -149,7 +149,7 @@ def filter_quality_fires(df, labels, min_detections=5, min_duration_days=3):
 
 def main():
     # Paths
-    repo_root = Path('/home/chaseungjoon/code/WildfirePrediction-SSD')
+    repo_root = Path('/')
     viirs_path = repo_root / 'embedded_data' / 'nasa_viirs_with_weather.parquet'
     output_dir = repo_root / 'data' / 'filtered_fires'
     output_dir.mkdir(exist_ok=True, parents=True)

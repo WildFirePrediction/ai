@@ -275,7 +275,7 @@ Create script to:
 ## Command to Resume Training
 
 ```bash
-PYTHONPATH=/home/chaseungjoon/code/WildfirePrediction-SSD:$PYTHONPATH \
+PYTHONPATH=/home/chaseungjoon/code/WildfirePrediction:$PYTHONPATH \
 python3 rl_training/supervised/train_unet.py \
   --epochs 5 \
   --batch-size 2 \
