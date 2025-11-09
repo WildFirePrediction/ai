@@ -1,12 +1,18 @@
+# dot files
 .DS_Store
 .idea
+.claude
+.venv
+._*
+
+# directories
+data
+tilling_data
+rl_training/supervised/checkpoints_unet/best_model
+
+
+# files
 *.html
 __pycache__
 *.pyc
-.claude
-data
-tilling_data
-.venv
-._*
 *.pt
-rl_training/supervised/checkpoints_unet/best_model
