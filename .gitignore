@@ -9,3 +9,4 @@ tilling_data
 .venv
 ._*
 *.pt
+rl_training/supervised/checkpoints_unet/best_model
