@@ -1,15 +1,15 @@
 """
-01 - Spatial Episode Region Extraction
-Creates per-episode spatial regions where each "tile" is a single 400m grid cell.
-For each fire episode we extract the bounding box (in grid coordinates) of all detections
+01 - Spatial Window Region Extraction
+Creates per-window spatial regions where each "tile" is a single 400m grid cell.
+For each sliding window we extract the bounding box (in grid coordinates) of all detections
 and expand it by PAD=5 cells in all directions (if possible) so the agent has access to
 full fire extent + margin.
 
 Output:
-  tilled_data/episode_regions.parquet  (index of regions)
-  tilled_data/regions/episode_region_<episode_id>.npz  (static cropped arrays)
+  tilled_data/window_regions.parquet  (index of regions)
+  tilled_data/regions/window_region_<window_id>.npz  (static cropped arrays)
 
-Use --max-episodes N for a quick smoke test.
+Use --max-windows N for a quick smoke test.
 """
 
 import sys
@@ -33,14 +33,14 @@ PAD = 5  # cells of padding around episode extent
 RESOLUTION = 400  # meters per pixel/cell (one cell = one tile in new spec)
 
 print("=" * 80)
-print("EPISODE REGION EXTRACTION")
+print("WINDOW REGION EXTRACTION (Sliding Windows)")
 print("=" * 80)
 
 # ---------------------------------------------------------------------------
 # Args
 # ---------------------------------------------------------------------------
 parser = argparse.ArgumentParser()
-parser.add_argument('--max-episodes', type=int, default=None, help='Limit number of episodes processed (for testing)')
+parser.add_argument('--max-windows', type=int, default=None, help='Limit number of windows processed (for testing)')
 args = parser.parse_args()
 
 # ---------------------------------------------------------------------------
@@ -64,15 +64,15 @@ print(f"  Grid size: {W} x {H} cells (400m resolution)")
 lcm = state.get('lcm_classes')
 fsm = state.get('fsm_classes')
 
-# Load fire detections (reclustered with weather for richest features)
-df_fire = pd.read_parquet(embedded_dir / 'nasa_viirs_with_weather_reclustered.parquet')
-df_episodes = pd.read_parquet(embedded_dir / 'episode_index_reclustered.parquet')
-print(f"  Episodes available: {len(df_episodes)}")
+# Load fire detections and sliding windows
+df_fire = pd.read_parquet(embedded_dir / 'nasa_viirs_with_weather.parquet')  # Original data, no reclustering needed
+df_windows = pd.read_parquet(embedded_dir / 'sliding_windows_index.parquet')
+print(f"  Windows available: {len(df_windows)}")
 print(f"  Fire detections: {len(df_fire):,}")
 
-if args.max_episodes:
-    df_episodes = df_episodes.head(args.max_episodes)
-    print(f"  Limiting to first {len(df_episodes)} episodes for test run")
+if args.max_windows:
+    df_windows = df_windows.head(args.max_windows)
+    print(f"  Limiting to first {len(df_windows)} windows for test run")
 
 # ---------------------------------------------------------------------------
 # Helper conversions
@@ -89,15 +89,15 @@ def indices_to_world(row: int, col: int):
     return x, y
 
 # ---------------------------------------------------------------------------
-# 2. BUILD PER-EPISODE REGION DEFINITIONS
+# 2. BUILD PER-WINDOW REGION DEFINITIONS
 # ---------------------------------------------------------------------------
-print("\n[2/5] Computing episode regions (extent + padding)...")
+print("\n[2/5] Computing window regions (extent + padding)...")
 regions = []
 
-for _, ep in tqdm(df_episodes.iterrows(), total=len(df_episodes), desc='  Episodes'):
-    ep_id = int(ep['episode_id'])
-    x_min, x_max = ep['x_min'], ep['x_max']
-    y_min, y_max = ep['y_min'], ep['y_max']
+for _, win in tqdm(df_windows.iterrows(), total=len(df_windows), desc='  Windows'):
+    win_id = int(win['window_id'])
+    x_min, x_max = win['x_min'], win['x_max']
+    y_min, y_max = win['y_min'], win['y_max']
 
     # Convert world bounds to grid indices
     r_min, c_min = world_to_indices(x_min, y_max)  # y_max is northern edge (smaller row index)
@@ -116,12 +116,20 @@ for _, ep in tqdm(df_episodes.iterrows(), total=len(df_episodes), desc='  Episod
     if height <= 0 or width <= 0:
         continue
 
-    # Episode detection subset (for stats)
-    ep_fire = df_fire[df_fire['episode_id'] == ep_id]
-    n_det = len(ep_fire)
+    # Window detection subset (for stats)
+    # Filter by spatial and temporal bounds
+    win_fire = df_fire[
+        (df_fire['datetime'] >= win['time_start']) &
+        (df_fire['datetime'] <= win['time_end']) &
+        (df_fire['x'] >= x_min) &
+        (df_fire['x'] <= x_max) &
+        (df_fire['y'] >= y_min) &
+        (df_fire['y'] <= y_max)
+    ]
+    n_det = len(win_fire)
 
     regions.append({
-        'episode_id': ep_id,
+        'window_id': win_id,
         'row_start': r0,
         'row_end': r1,
         'col_start': c0,
@@ -129,10 +137,10 @@ for _, ep in tqdm(df_episodes.iterrows(), total=len(df_episodes), desc='  Episod
         'height': height,
         'width': width,
         'n_detections': n_det,
-        'duration_hours': float(ep['duration_hours']),
-        'spatial_extent_km': float(ep['spatial_extent_km']),
-        'time_start': ep['time_start'],
-        'time_end': ep['time_end']
+        'duration_hours': float(win['duration_hours']),
+        'spatial_extent_km': float(win['spatial_extent_km']),
+        'time_start': win['time_start'],
+        'time_end': win['time_end']
     })
 
 print(f"  Regions computed: {len(regions)}")
@@ -140,7 +148,7 @@ print(f"  Regions computed: {len(regions)}")
 # ---------------------------------------------------------------------------
 # 3. EXTRACT & SAVE STATIC CROPS
 # ---------------------------------------------------------------------------
-print("\n[3/5] Saving static cropped arrays per episode...")
+print("\n[3/5] Saving static cropped arrays per window...")
 region_records = []
 
 for reg in tqdm(regions, desc='  Saving regions'):
@@ -149,7 +157,7 @@ for reg in tqdm(regions, desc='  Saving regions'):
 
     continuous_crop = continuous[:, r0:r1, c0:c1].astype(np.float32)
     save_dict = {
-        'episode_id': reg['episode_id'],
+        'window_id': reg['window_id'],
         'continuous_features': continuous_crop,
         'feature_names': np.array(feature_names, dtype=object),
         'grid_coords': {
@@ -167,7 +175,7 @@ for reg in tqdm(regions, desc='  Saving regions'):
     if fsm is not None:
         save_dict['fsm_classes'] = fsm[r0:r1, c0:c1].astype(np.uint16)
 
-    np.savez_compressed(regions_dir / f'episode_region_{reg["episode_id"]:05d}.npz', **save_dict)
+    np.savez_compressed(regions_dir / f'window_region_{reg["window_id"]:05d}.npz', **save_dict)
 
     region_records.append(reg)
 
@@ -176,7 +184,7 @@ for reg in tqdm(regions, desc='  Saving regions'):
 # ---------------------------------------------------------------------------
 print("\n[4/5] Writing region index parquet...")
 df_regions = pd.DataFrame(region_records)
-index_path = tilling_dir / 'episode_regions.parquet'
+index_path = tilling_dir / 'window_regions.parquet'
 df_regions.to_parquet(index_path, index=False)
 print(f"  Saved: {index_path}")
 
@@ -184,13 +192,13 @@ print(f"  Saved: {index_path}")
 # 5. SUMMARY
 # ---------------------------------------------------------------------------
 print("\n[5/5] Summary")
-print(f"  Episodes processed: {len(df_regions)}")
+print(f"  Windows processed: {len(df_regions)}")
 print(f"  Mean region size (cells): {df_regions['height'].mean():.1f} x {df_regions['width'].mean():.1f}")
 print(f"  Mean detections per episode: {df_regions['n_detections'].mean():.1f}")
 print(f"  Mean duration hours: {df_regions['duration_hours'].mean():.1f}")
 
 summary = {
-    'episodes_processed': int(len(df_regions)),
+    'windows_processed': int(len(df_regions)),
     'mean_height': float(df_regions['height'].mean()),
     'mean_width': float(df_regions['width'].mean()),
     'mean_detections': float(df_regions['n_detections'].mean()),
@@ -199,10 +207,10 @@ summary = {
     'resolution_m': RESOLUTION,
     'feature_names': feature_names
 }
-with open(tilling_dir / 'episode_region_summary.json', 'w') as f:
+with open(tilling_dir / 'window_region_summary.json', 'w') as f:
     json.dump(summary, f, indent=2)
-print(f"  Saved summary: {tilling_dir / 'episode_region_summary.json'}")
+print(f"  Saved summary: {tilling_dir / 'window_region_summary.json'}")
 
 print("\n" + "=" * 80)
-print("EPISODE REGION EXTRACTION COMPLETE")
+print("WINDOW REGION EXTRACTION COMPLETE")
 print("=" * 80)

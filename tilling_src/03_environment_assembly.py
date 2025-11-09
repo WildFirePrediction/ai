@@ -1,7 +1,7 @@
 """
-03 - Environment Assembly (Per-episode agent)
+03 - Environment Assembly (Per-window agent)
 Build RL-ready environments where:
-- One agent per episode starts at initial ignition cell
+- One agent per sliding window observes fire progression
 - Observation per timestep: [static (3+2), fire (4), weather (5)]
 - Action space: 9 directions (N, NE, E, SE, S, SW, W, NW, NONE)
 
@@ -33,15 +33,15 @@ ACTION_TO_DELTA = {
 }
 
 print("=" * 80)
-print("ENVIRONMENT ASSEMBLY (PER-EPISODE)")
+print("ENVIRONMENT ASSEMBLY (PER-WINDOW)")
 print("=" * 80)
 
 # ---------------------------------------------------------------------------
 # 1. LOAD DATA
 # ---------------------------------------------------------------------------
 print("\n[1/4] Loading static crops and sequences...")
-regions_df = pd.read_parquet(tilling_dir / 'episode_regions.parquet')
-seq_files = sorted((tilling_dir / 'sequences').glob('episode_*.npz'))
+regions_df = pd.read_parquet(tilling_dir / 'window_regions.parquet')
+seq_files = sorted((tilling_dir / 'sequences').glob('window_*.npz'))
 print(f"  Regions: {len(regions_df)} | Sequences: {len(seq_files)}")
 
 with open(embedded_dir / 'grid_metadata.json', 'r') as f:
@@ -54,10 +54,10 @@ print("\n[2/4] Building environments...")
 manifest = []
 count = 0
 
-for seq_path in tqdm(seq_files, desc='  Episodes'):
-    ep_id = int(seq_path.stem.split('_')[1])
+for seq_path in tqdm(seq_files, desc='  Windows'):
+    win_id = int(seq_path.stem.split('_')[1])
 
-    reg_path = tilling_dir / 'regions' / f'episode_region_{ep_id:05d}.npz'
+    reg_path = tilling_dir / 'regions' / f'window_region_{win_id:05d}.npz'
     if not reg_path.exists():
         continue
 
@@ -88,9 +88,15 @@ for seq_path in tqdm(seq_files, desc='  Episodes'):
     timesteps = seq['timesteps']
     T = fire_masks.shape[0]
 
+    # CRITICAL: Validate temporal and static dimensions match!
+    if fire_masks.shape[1:] != (H, W):
+        print(f"  WARNING: Skipping env {win_id} - dimension mismatch!")
+        print(f"    Static: ({H}, {W}) | Temporal: {fire_masks.shape[1:]}")
+        continue
+
     # Build observation tensor lazily in training; here store components
     env = {
-        'episode_id': ep_id,
+        'window_id': win_id,
         'grid_coords': reg['grid_coords'].item(),
         'world_bounds': reg['world_bounds'].item(),
         'static': {
@@ -122,13 +128,13 @@ for seq_path in tqdm(seq_files, desc='  Episodes'):
         }
     }
 
-    out_file = env_dir / f'env_{ep_id:05d}.pkl'
+    out_file = env_dir / f'env_{win_id:05d}.pkl'
     with open(out_file, 'wb') as f:
         pickle.dump(env, f, protocol=pickle.HIGHEST_PROTOCOL)
 
     manifest.append({
-        'env_id': f'env_{ep_id:05d}',
-        'episode_id': ep_id,
+        'env_id': f'env_{win_id:05d}',
+        'window_id': win_id,
         'num_timesteps': int(T),
         'height': int(H),
         'width': int(W),

@@ -1,6 +1,6 @@
 """
-02 - Temporal Segmentation (Per-episode regions)
-For each episode region (extent + padding), create a temporal sequence of fire state and
+02 - Temporal Segmentation (Per-window regions)
+For each window region (extent + padding), create a temporal sequence of fire state and
 aggregated weather at the same grid resolution (400m per cell). Each timestep captures
 mask/intensity/temp/age and a 5-dim weather vector.
 """
@@ -26,20 +26,20 @@ RESOLUTION = 400  # m per cell
 PAD = 5           # kept for doc consistency
 
 print("=" * 80)
-print("TEMPORAL SEGMENTATION (PER-EPISODE)")
+print("TEMPORAL SEGMENTATION (PER-WINDOW)")
 print("=" * 80)
 
 # ---------------------------------------------------------------------------
 # 1. LOAD DATA
 # ---------------------------------------------------------------------------
 print("\n[1/4] Loading regions and fire data...")
-regions_df = pd.read_parquet(tilling_dir / 'episode_regions.parquet')
-print(f"  Episode regions: {len(regions_df)}")
+regions_df = pd.read_parquet(tilling_dir / 'window_regions.parquet')
+print(f"  Window regions: {len(regions_df)}")
 
 # Fire detections with weather
-fire_df = pd.read_parquet(embedded_dir / 'nasa_viirs_with_weather_reclustered.parquet')
-# Episode index
-epi_df = pd.read_parquet(embedded_dir / 'episode_index_reclustered.parquet')
+fire_df = pd.read_parquet(embedded_dir / 'nasa_viirs_with_weather.parquet')
+# Window index
+windows_df = pd.read_parquet(embedded_dir / 'sliding_windows_index.parquet')
 
 # ---------------------------------------------------------------------------
 # 2. HELPERS
@@ -60,33 +60,33 @@ print("\n[2/4] Building sequences...")
 num_sequences = 0
 num_timesteps = 0
 
-for _, reg in tqdm(regions_df.iterrows(), total=len(regions_df), desc='  Episodes'):
-    ep_id = int(reg['episode_id'])
+for _, reg in tqdm(regions_df.iterrows(), total=len(regions_df), desc='  Windows'):
+    win_id = int(reg['window_id'])
     r0, r1, c0, c1 = int(reg['row_start']), int(reg['row_end']), int(reg['col_start']), int(reg['col_end'])
     H, W = r1 - r0, c1 - c0
 
-    # Episode detections within region bounds
-    ep_fire = fire_df[(fire_df['episode_id'] == ep_id) &
-                      (fire_df['x'] >= (None if np.nan else 0))]  # placeholder to ensure copy
-    # Filter by grid coords bounds
-    # Convert world to index approximations using episode bbox edges
-    # We'll simply filter by world bounds from index convert saved in region NPZ
-    reg_npz = np.load(tilling_dir / 'regions' / f'episode_region_{ep_id:05d}.npz', allow_pickle=True)
+    # Window detections within region bounds
+    # Load region bounds from saved NPZ
+    reg_npz = np.load(tilling_dir / 'regions' / f'window_region_{win_id:05d}.npz', allow_pickle=True)
     wb = reg_npz['world_bounds'].item()
-    ep_fire = fire_df[(fire_df['episode_id'] == ep_id) &
-                      (fire_df['x'] >= wb['x_min']) & (fire_df['x'] <= wb['x_max']) &
-                      (fire_df['y'] >= wb['y_min']) & (fire_df['y'] <= wb['y_max'])].copy()
 
-    if len(ep_fire) == 0:
+    # Get window info from index
+    win_info = windows_df[windows_df['window_id'] == win_id].iloc[0]
+    t_start, t_end = win_info['time_start'], win_info['time_end']
+
+    # Filter fire detections by spatial and temporal bounds
+    win_fire = fire_df[
+        (fire_df['datetime'] >= t_start) &
+        (fire_df['datetime'] <= t_end) &
+        (fire_df['x'] >= wb['x_min']) & (fire_df['x'] <= wb['x_max']) &
+        (fire_df['y'] >= wb['y_min']) & (fire_df['y'] <= wb['y_max'])
+    ].copy()
+
+    if len(win_fire) == 0:
         continue
 
-    ep_info = epi_df[epi_df['episode_id'] == ep_id].iloc[0]
-    t_start, t_end = ep_info['time_start'], ep_info['time_end']
-
-    # 6-hour timesteps across episode
-    timesteps = pd.date_range(start=t_start, end=t_end, freq='6h')
-    if len(timesteps) < 2:
-        continue
+    # 2-hour timesteps across episode (CHANGED from 6h for better density)
+    timesteps = pd.date_range(start=t_start, end=t_end, freq='2h')
 
     masks = []
     intens = []
@@ -107,34 +107,35 @@ for _, reg in tqdm(regions_df.iterrows(), total=len(regions_df), desc='  Episode
         return row, col
 
     for t in timesteps:
-        win_start = t - pd.Timedelta(hours=3)
+        win_start = t - pd.Timedelta(hours=3)  # ±3h window for better fire continuity
         win_end = t + pd.Timedelta(hours=3)
-        dets = ep_fire[(ep_fire['datetime'] >= win_start) & (ep_fire['datetime'] <= win_end)]
+        dets = win_fire[(win_fire['datetime'] >= win_start) & (win_fire['datetime'] <= win_end)]
+
+        # SKIP TIMESTEPS WITH NO FIRE (prevents sparse/discontinuous sequences)
+        if len(dets) == 0:
+            continue
 
         fm, fi, ft, fa, cnt = create_grids(H, W)
 
-        if len(dets) > 0:
-            for _, drow in dets.iterrows():
-                rr, cc = to_rc(drow['x'], drow['y'])
-                rr -= r0
-                cc -= c0
-                if 0 <= rr < H and 0 <= cc < W:
-                    fm[rr, cc] = 1
-                    fi[rr, cc] += float(drow['i'])
-                    ft[rr, cc] += float(drow['te'])
-                    # age since episode start
-                    age_h = (drow['datetime'] - t_start).total_seconds() / 3600.0
-                    fa[rr, cc] = max(fa[rr, cc], age_h)
-                    cnt[rr, cc] += 1
-            nz = cnt > 0
-            fi[nz] /= cnt[nz]
-            ft[nz] /= cnt[nz]
-            weather = np.array([
-                dets['w'].mean(), dets['d_x'].mean(), dets['d_y'].mean(), dets['rh'].mean(), dets['r'].mean()
-            ], dtype=np.float32)
-            weather = np.nan_to_num(weather, nan=0.0)
-        else:
-            weather = np.zeros(5, dtype=np.float32)
+        for _, drow in dets.iterrows():
+            rr, cc = to_rc(drow['x'], drow['y'])
+            rr -= r0
+            cc -= c0
+            if 0 <= rr < H and 0 <= cc < W:
+                fm[rr, cc] = 1
+                fi[rr, cc] += float(drow['i'])
+                ft[rr, cc] += float(drow['te'])
+                # age since episode start
+                age_h = (drow['datetime'] - t_start).total_seconds() / 3600.0
+                fa[rr, cc] = max(fa[rr, cc], age_h)
+                cnt[rr, cc] += 1
+        nz = cnt > 0
+        fi[nz] /= cnt[nz]
+        ft[nz] /= cnt[nz]
+        weather = np.array([
+            dets['w'].mean(), dets['d_x'].mean(), dets['d_y'].mean(), dets['rh'].mean(), dets['r'].mean()
+        ], dtype=np.float32)
+        weather = np.nan_to_num(weather, nan=0.0)
 
         masks.append(fm)
         intens.append(fi)
@@ -143,8 +144,12 @@ for _, reg in tqdm(regions_df.iterrows(), total=len(regions_df), desc='  Episode
         weathers.append(weather)
         t_values.append(np.int64(pd.Timestamp(t).value))
 
+    # Skip windows with too few fire timesteps (need at least 3 for learning)
+    if len(masks) < 3:
+        continue
+
     seq = {
-        'episode_id': ep_id,
+        'window_id': win_id,
         'grid_coords': {'row_start': r0, 'row_end': r1, 'col_start': c0, 'col_end': c1},
         'timesteps': np.array(t_values, dtype=np.int64),
         'fire_masks': np.stack(masks, axis=0).astype(np.uint8),
@@ -154,7 +159,7 @@ for _, reg in tqdm(regions_df.iterrows(), total=len(regions_df), desc='  Episode
         'weather_states': np.stack(weathers, axis=0).astype(np.float32)
     }
 
-    out = sequences_dir / f'episode_{ep_id:05d}.npz'
+    out = sequences_dir / f'window_{win_id:05d}.npz'
     np.savez_compressed(out, **seq)
 
     num_sequences += 1
@@ -177,5 +182,5 @@ with open(tilling_dir / 'temporal_segments_summary.json', 'w') as f:
 print(f"  Saved summary: {tilling_dir / 'temporal_segments_summary.json'}")
 
 print("\n" + "=" * 80)
-print("TEMPORAL SEGMENTATION COMPLETE (PER-EPISODE)")
+print("TEMPORAL SEGMENTATION COMPLETE (PER-WINDOW)")
 print("=" * 80)
