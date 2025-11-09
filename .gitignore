@@ -1,5 +1,3 @@
-.direnv
-.envrc
 .DS_Store
 .idea
 *.html
@@ -9,6 +7,5 @@ __pycache__
 data
 tilling_data
 .venv
-src/check_layers.py
-src/get_ndvi.py
 ._*
+*.pt
