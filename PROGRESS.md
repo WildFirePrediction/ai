@@ -602,4 +602,4 @@ Training is ongoing. Results at episode 1000 will determine if RL can surpass su
 ---
 
 **Project Repository:** `/home/chaseungjoon/code/WildfirePrediction`
-**Documentation:** See `A3C_CORRECT_FORMULATION.md` and `SUPERVISED_ACCURACY_ANALYSIS.md` for detailed technical specifications
+**Documentation:** See `A3C_CORRECT_FORMULATION.md` for detailed technical specifications
