@@ -150,7 +150,6 @@ class WildfireEnvSpatial:
 
         iou = intersection / float(union)
 
-        # IoU is in [0, 1], scale to [-1, 1] for better RL training
-        reward = 2.0 * iou - 1.0
-
-        return reward
+        # Return IoU directly (0 to 1 range)
+        # Dense reward for RL training
+        return iou

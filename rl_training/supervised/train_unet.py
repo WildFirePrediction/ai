@@ -13,6 +13,7 @@ from pathlib import Path
 import numpy as np
 import sys
 from tqdm import tqdm
+import wandb
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -179,6 +180,9 @@ def main():
     parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
     parser.add_argument('--max-envs', type=int, default=None, help='Limit number of environments')
     parser.add_argument('--num-workers', type=int, default=4, help='DataLoader workers')
+    parser.add_argument('--wandb-project', type=str, default='wildfire-prediction', help='WandB project name')
+    parser.add_argument('--wandb-run-name', type=str, default=None, help='WandB run name (auto-generated if not provided)')
+    parser.add_argument('--no-wandb', action='store_true', help='Disable WandB logging')
     args = parser.parse_args()
 
     repo_root = Path(args.repo_root)
@@ -208,6 +212,29 @@ def main():
     print(f"Device: {args.device}")
     print(f"Batch size: {args.batch_size}")
     print(f"=" * 80)
+
+    # Initialize WandB
+    use_wandb = not args.no_wandb
+    if use_wandb:
+        wandb_run_name = args.wandb_run_name or f"unet-lr{args.lr}-bs{args.batch_size}-e{args.epochs}"
+        wandb.init(
+            project=args.wandb_project,
+            name=wandb_run_name,
+            config={
+                "model": "UNet",
+                "learning_rate": args.lr,
+                "batch_size": args.batch_size,
+                "epochs": args.epochs,
+                "device": args.device,
+                "train_envs": len(train_paths),
+                "val_envs": len(val_paths),
+                "num_workers": args.num_workers,
+                "max_envs": args.max_envs,
+            }
+        )
+        print(f"WandB initialized: {wandb.run.name}")
+    else:
+        print("WandB logging disabled")
 
     # Create datasets
     train_dataset = FireSpreadDataset(train_paths)
@@ -239,6 +266,9 @@ def main():
     total_params = sum(p.numel() for p in model.parameters())
     print(f"Model parameters: {total_params:,}")
 
+    if use_wandb:
+        wandb.config.update({"model_parameters": total_params})
+
     # Optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
@@ -259,17 +289,38 @@ def main():
         val_loss, val_iou = evaluate(model, val_loader, args.device)
         print(f"Val   - Loss: {val_loss:.4f} | IoU: {val_iou:.4f}")
 
+        # Log to WandB
+        if use_wandb:
+            wandb.log({
+                "epoch": epoch,
+                "train/loss": train_loss,
+                "train/iou": train_iou,
+                "val/loss": val_loss,
+                "val/iou": val_iou,
+            })
+
         # Save best model
         if val_iou > best_val_iou:
             best_val_iou = val_iou
+            best_model_path = checkpoint_dir / 'best_model.pt'
             torch.save({
                 'epoch': epoch,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'val_iou': val_iou,
                 'val_loss': val_loss
-            }, checkpoint_dir / 'best_model.pt')
+            }, best_model_path)
             print(f"✓ Saved best model (IoU: {val_iou:.4f})")
+
+            # Log best model to WandB as artifact
+            if use_wandb:
+                artifact = wandb.Artifact(
+                    name='best-model',
+                    type='model',
+                    description=f'Best U-Net model at epoch {epoch} with IoU {val_iou:.4f}'
+                )
+                artifact.add_file(str(best_model_path))
+                wandb.log_artifact(artifact)
 
         # Save checkpoint EVERY epoch
         torch.save({
@@ -286,6 +337,10 @@ def main():
     print(f"Best Validation IoU: {best_val_iou:.4f}")
     print(f"Checkpoints saved to: {checkpoint_dir}")
     print(f"=" * 80)
+
+    # Finish WandB run
+    if use_wandb:
+        wandb.finish()
 
 
 if __name__ == '__main__':
