@@ -202,6 +202,13 @@ def main():
     total_params = sum(p.numel() for p in shared_model.parameters())
     print(f"Model parameters: {total_params:,}")
 
+    # Create timestamped checkpoint directory
+    from datetime import datetime
+    timestamp = datetime.now().strftime("%y%m%d-%H%M")
+    ckpt_dir = repo_root / 'rl_training' / 'a3c' / 'checkpoints_v3' / timestamp
+    ckpt_dir.mkdir(exist_ok=True, parents=True)
+    print(f"Checkpoint directory: {ckpt_dir}")
+
     # Create shared optimizer
     optimizer = torch.optim.Adam(shared_model.parameters(), lr=args.lr)
 
@@ -222,6 +229,7 @@ def main():
         'max_grad_norm': args.max_grad_norm,
         'max_episodes': args.max_episodes,
         'log_interval': args.log_interval,
+        'checkpoint_dir': str(ckpt_dir),  # Pass checkpoint dir to workers
     }
 
     # Create workers
@@ -253,10 +261,7 @@ def main():
         for p in processes:
             p.join()
 
-    # Save final model
-    ckpt_dir = repo_root / 'rl_training' / 'a3c' / 'checkpoints_v3'
-    ckpt_dir.mkdir(exist_ok=True, parents=True)
-
+    # Save final model (use existing timestamped ckpt_dir)
     final_path = ckpt_dir / 'final_model.pt'
     torch.save({
         'model_state_dict': shared_model.state_dict(),

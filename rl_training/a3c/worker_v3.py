@@ -253,10 +253,22 @@ def worker_process_correct(worker_id, shared_model, optimizer, filtered_episodes
             global_episode_counter.value += 1
             episode_count = global_episode_counter.value
 
-            # Update best IoU
+            # Update best IoU and save checkpoint
             avg_iou = episode_iou / max(1, steps)
             if avg_iou > global_best_iou.value:
                 global_best_iou.value = avg_iou
+
+                # Save best model checkpoint
+                checkpoint_dir = Path(config['checkpoint_dir'])
+                best_model_path = checkpoint_dir / 'best_model.pt'
+                torch.save({
+                    'episode': episode_count,
+                    'model_state_dict': shared_model.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'best_iou': avg_iou,
+                    'worker_id': worker_id
+                }, best_model_path)
+                print(f"[Worker {worker_id}] NEW BEST IoU: {avg_iou:.4f} at episode {episode_count} - Checkpoint saved!")
 
         # Log progress
         if episode_count % config.get('log_interval', 10) == 0:
