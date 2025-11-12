@@ -43,3 +43,4 @@ GDAL==3.8.4
 # Additional utilities
 python-dateutil>=2.8.0
 pyyaml>=6.0.0
+wandb
