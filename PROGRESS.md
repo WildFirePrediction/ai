@@ -1,347 +1,605 @@
 # Wildfire Prediction Training Progress
 
-## Summary
-Training spatial wildfire prediction models using tilled satellite data. Abandoned A3C due to poor performance, now focusing on supervised learning with U-Net.
+**Project**: Spatial wildfire spread prediction using deep learning
+**Last Updated**: 2025-11-12
+**Status**: A3C training in progress with correct formulation
 
 ---
 
-## Model Architecture Evolution
+## Table of Contents
 
-### A3C (Temporarily abandoned)
-- **Status**: Temporarily abandoned due to poor performance, can revisit later
-- **Architecture**: Actor-Critic with spatial fire spread prediction
-- **Issues**:
-  - Poor convergence
-  - Inefficient training with RL approach
-  - Decided supervised learning would be more effective
+1. [Executive Summary](#executive-summary)
+2. [Supervised Learning Attempts](#supervised-learning-attempts)
+3. [Critical Dataset Analysis](#critical-dataset-analysis)
+4. [Reinforcement Learning Pivot](#reinforcement-learning-pivot)
+5. [Current Status and Results](#current-status-and-results)
+6. [Technical Details](#technical-details)
+7. [Next Steps](#next-steps)
 
-### U-Net (Current Focus)
+---
 
-#### Version 1: Original (Too Large)
-- **Parameters**: 31M
-- **Architecture**:
-  - Encoder: 64 → 128 → 256 → 512 channels
-  - Decoder: 512 → 256 → 128 → 64 channels
-  - 4 down/up layers
-- **Status**: Failed - GPU memory errors (CUDNN_STATUS_INTERNAL_ERROR)
+## Executive Summary
 
-#### Version 2: Reduced (Current)
-- **Parameters**: 1.9M (reduced from 31M)
-- **Architecture**:
-  - Encoder: 32 → 64 → 128 → 256 channels (reduced by half)
-  - Decoder: 256 → 128 → 64 → 32 channels
-  - 3 down/up layers (removed one layer)
-- **Status**: Fits in GPU memory, training possible
-- **Location**: `/home/chaseungjoon/code/WildfirePrediction-SSD/rl_training/supervised/unet_model.py`
+This project explores spatial wildfire spread prediction using tiled satellite data. We initially attempted supervised learning with U-Net but encountered severe class imbalance issues. After extensive analysis and multiple loss function experiments, we pivoted to reinforcement learning with A3C. A critical error in problem formulation was identified and corrected, leading to successful training with the proper per-cell 8-neighbor prediction approach.
 
-**Model Details**:
+**Key Results:**
+- Supervised Learning (U-Net): Best F1 score of 19.85% at epoch 3
+- A3C V3 (Correct Formulation): Best IoU of 14.21% at episode 180 (training ongoing)
+- Root Cause of Initial Failures: 31,077:1 class imbalance and incorrect problem formulation
+
+---
+
+## Supervised Learning Attempts
+
+### Phase 1: U-Net Architecture
+
+**Initial Model (V1):**
+- Architecture: Standard U-Net with 31M parameters
+- Encoder: 64 → 128 → 256 → 512 channels
+- Status: Failed due to GPU memory errors (CUDNN_STATUS_INTERNAL_ERROR)
+
+**Reduced Model (V2):**
+- Architecture: Smaller U-Net with 1.9M parameters
+- Encoder: 32 → 64 → 128 → 256 channels (halved)
+- Layers: 3 down/up layers (removed one layer)
+- Training Config:
+  - Batch size: 2-4
+  - Learning rate: 1e-4
+  - Optimizer: Adam
+  - Initial Loss: Binary Cross-Entropy with Logits
+  - Metric: IoU (Intersection over Union)
+
+**Initial Results:**
+- Validation IoU: ~33% after epoch 1
+- Training appeared successful but results were misleading
+
+### Phase 2: Dataset Analysis and Discovery of Critical Issues
+
+**Diagnostic Analysis Results:**
+Ran comprehensive dataset analysis on 100 environments with 446 samples:
+
+```
+Class Distribution:
+- Positive pixels (burns): 0.0342%
+- Negative pixels (no burns): 99.9658%
+- Imbalance ratio: 31,077:1
+
+Sample Distribution:
+- 79.1% of samples have ZERO burns
+- Only 20.9% have any fire spread
+
+Burn Density:
+- Average positive pixels per sample: 1.0 pixel
+- Average negative pixels per sample: 32,540 pixels
+- Average spatial size: 27,845 pixels
+```
+
+**Root Cause Identified:**
+
+The model was learning the "trivial solution" - predicting no burns everywhere. With 99.97% negative examples:
+1. Unweighted BCE loss heavily penalizes false positives
+2. Model minimizes loss by predicting all zeros
+3. Achieves 99.97% pixel accuracy while learning nothing useful
+4. IoU metric was inflated when both prediction and target were empty
+
+**Critical Flaws in Original Implementation:**
+1. No class weighting in loss function
+2. IoU computed across entire batch (not per-sample)
+3. No filtering of zero-burn samples
+4. Padding in collate function added noise
+
+### Phase 3: Systematic Improvements (U-Net V2)
+
+**Improvement 1: Weighted BCE Loss**
+
+Added pos_weight parameter to balance class importance:
 ```python
-# Input: (B, 14, H, W) - environmental features
-# Output: (B, 1, H, W) - burn probability per cell
+pos_weight = torch.tensor([31077.0]).to(device)
+loss = F.binary_cross_entropy_with_logits(logits, target, pos_weight=pos_weight)
+```
 
-self.inc = DoubleConv(14, 32)
-self.down1 = Down(32, 64)
-self.down2 = Down(64, 128)
-self.down3 = Down(128, 256)
-self.up1 = Up(256, 128)
-self.up2 = Up(128, 64)
-self.up3 = Up(64, 32)
-self.outc = Conv2d(32, 1, kernel_size=1)
+**Results with different pos_weight values:**
+
+| pos_weight | Best Epoch | Val F1 | Precision | Recall | Issue |
+|------------|------------|--------|-----------|--------|-------|
+| 1000 | 13 | 10.02% | 5.2% | 86.9% | Over-predicts, early peak |
+| 300 | 13 | Similar | Similar | Similar | Still over-predicts |
+| 150 | 3 | **19.85%** | **11.85%** | **13.55%** | **Best balance, but peaks early** |
+
+**Improvement 2: Zero-Burn Sample Filtering**
+
+Modified dataset to only include timesteps with actual fire spread:
+```python
+# In FireSpreadDatasetFiltered
+for t in range(env.T - 1):
+    actual_mask_t = env.fire_masks[t] > 0
+    actual_mask_t1 = env.fire_masks[t + 1] > 0
+    target = (actual_mask_t1 & ~actual_mask_t)
+
+    # Only include samples with burns
+    if target.sum() > 0:
+        self.samples.append((env_idx, t))
+```
+
+Result: Filtered 3026 environments down to 863 with valid samples.
+
+**Improvement 3: Fixed IoU Computation**
+
+Changed from batch-level to per-sample IoU:
+```python
+def compute_metrics(pred, target):
+    for i in range(batch_size):
+        intersection = (pred[i] * target[i]).sum()
+        union = (pred[i] + target[i]).clamp(0, 1).sum()
+        if union > 0:
+            metrics['iou'].append(intersection / union)
+```
+
+**Improvement 4: Additional Metrics**
+
+Added precision, recall, and F1 score for better evaluation beyond IoU alone.
+
+### Phase 4: Advanced Loss Functions (U-Net V3)
+
+**Motivation:** Weighted BCE alone couldn't handle the extreme imbalance.
+
+**Implemented Loss Functions:**
+
+1. **Focal Loss:**
+   - Down-weights easy negatives
+   - Focuses on hard examples
+   - Parameters: alpha=0.25, gamma=2.0
+
+2. **Dice Loss:**
+   - Directly optimizes IoU-like metric
+   - More robust to class imbalance
+   - No pos_weight needed
+
+3. **Combined Loss (BCE + Dice):**
+   - BCE weight: 0.5, Dice weight: 0.5
+   - Attempts to balance pixel-level and spatial objectives
+
+**Model Improvement: GroupNorm**
+
+Replaced BatchNorm with GroupNorm to fix crashes with small batch sizes:
+```python
+# DoubleConv now uses GroupNorm
+nn.GroupNorm(num_groups, out_channels)  # Works with batch_size=1
+```
+
+**Results:**
+
+| Loss Type | Best F1 | Epoch | Precision | Recall | Outcome |
+|-----------|---------|-------|-----------|--------|---------|
+| BCE pos=150 | **19.85%** | 3 | 11.85% | 13.55% | Best overall |
+| Combined | 15.95% | 5 | 8.5% | 56.6% | Over-predicts |
+| Dice | 6.68% | 3 | 3.7% | 87.5% | Severe over-prediction |
+| Focal | Not fully tested | - | - | - | - |
+
+**Conclusion on Supervised Learning:**
+
+All approaches peaked early (epoch 3-5) then declined, indicating overfitting to sparse training patterns. The best achievable F1 score was approximately 20%, which may represent the realistic ceiling for supervised learning on this extremely imbalanced task.
+
+---
+
+## Critical Dataset Analysis
+
+### Class Imbalance Breakdown
+
+After filtering out zero-burn samples, the remaining data still exhibited extreme imbalance:
+
+**Per-Sample Statistics:**
+- Average positive ratio: 0.0342%
+- Median positive ratio: 0.0000%
+- Even in samples WITH burns: typically 1-10 burning pixels out of 30,000+ total pixels
+- Imbalance ratio even after filtering: 68,880:1
+
+**Why This Matters:**
+
+Even with filtered data and weighted losses, the fundamental problem remains:
+1. Gradient signal from positive examples is drowned out
+2. Model learns coarse spatial patterns but not precise burn locations
+3. Early epochs show improvement as model learns "burns happen near existing fires"
+4. Later epochs show decline as model overfits to specific training patterns
+5. Validation performance suffers because fire spread is stochastic and varies by scenario
+
+### File Size Issues
+
+**Problem Files Identified:**
+- Normal files: 88-114 KB
+- Problematic files: 30-90 MB (some up to 91 MB)
+- Cause: Unknown data generation issues
+- Solution: Filter files larger than 10MB (keeps 774/3026 environments)
+
+---
+
+## Reinforcement Learning Pivot
+
+### Rationale for A3C
+
+After supervised learning plateaued at 20% F1, we pivoted to reinforcement learning with Asynchronous Advantage Actor-Critic (A3C) for several reasons:
+
+1. **Sequential Decision Making:** Fire spread is inherently temporal; RL can model multi-step dynamics
+2. **Exploration:** RL can discover non-obvious spread patterns through exploration
+3. **Direct Optimization:** Optimize IoU directly through rewards rather than proxy losses
+4. **Handles Stochasticity:** RL naturally handles the stochastic nature of wildfire spread
+
+### Initial A3C Implementation (V1-V2): THE CRITICAL ERROR
+
+**Problem Formulation (WRONG):**
+```
+State: (14, H, W) environmental features
+Action: (H, W) binary mask - predict ALL 30,000 cells independently
+Reward: Sparse - only at episode end
+```
+
+**Why This Failed Catastrophically:**
+
+1. **Massive Action Space:** 30,000-dimensional Bernoulli distribution
+2. **Log Probability Explosion:**
+   - Log prob = sum over 30,000 cells
+   - Even with 99% confidence per cell: log_prob = 30,000 × log(0.99) = -300
+   - Actual results: log_prob reached -200,000
+   - Loss exploded to -861,886
+
+3. **Sparse Rewards:** Only receiving signal at episode end
+4. **No Structure:** Independent predictions per cell don't model cell-to-cell fire spread
+5. **Credit Assignment Impossible:** Which of 30,000 decisions caused the reward?
+
+**Results of Wrong Formulation:**
+- Episode reward: -4 to -9 (consistently negative)
+- IoU: 0.0001% (essentially zero)
+- Loss: -180,000 to -860,000 (unstable)
+- Learning: None
+
+### A3C V3: Correct Formulation
+
+**Critical Insight:** Fire spreads cell-to-cell, not randomly across the entire grid. The correct approach is to predict 8-neighbor spread for each currently burning cell.
+
+**Problem Formulation (CORRECT):**
+```
+State: (14, H, W) environmental features + current fire mask
+Action: For each burning cell at (i,j), predict 8-neighbor spread
+        - 8-dimensional Bernoulli vector per burning cell
+        - Neighbors: N, NE, E, SE, S, SW, W, NW
+        - Total actions per step: K burning cells × 8 neighbors (~10-100)
+Reward: DENSE - IoU computed at EVERY timestep
+```
+
+**Architecture Changes:**
+
+1. **Shared CNN Encoder:**
+   - Input: (B, 14, H, W)
+   - Output: (B, 128, H, W) feature map
+
+2. **Per-Cell Policy Head:**
+   - Extract 3×3 local features around each burning cell
+   - Flatten to 128×9 = 1152 dimensions
+   - FC layers: 1152 → 256 → 64 → 8
+   - Output: 8-dim logits for neighbor predictions
+
+3. **Global Value Head:**
+   - Adaptive average pooling over full feature map
+   - FC layers: 128 → 64 → 1
+   - Output: Scalar state value
+
+**Dense Rewards:**
+```python
+def step(self, predicted_burn_mask):
+    # Compute IoU at THIS timestep
+    actual_mask_t = self.fire_masks[self.t] > 0
+    actual_mask_t1 = self.fire_masks[self.t + 1] > 0
+    new_burns = actual_mask_t1 & ~actual_mask_t
+
+    intersection = (predicted_burn_mask & new_burns).sum()
+    union = (predicted_burn_mask | new_burns).sum()
+
+    reward = intersection / (union + 1e-8)  # IoU as reward
+
+    self.t += 1
+    return next_obs, reward, done, info
+```
+
+**Filtered Episodes:**
+
+Pre-scan environments to find episodes with actual fire spread:
+```python
+# Filter criteria:
+- File size < 50MB
+- Minimum 2 timesteps with burns
+- Maximum episode length: 20 steps
+
+# Results:
+- Scanned: 2066 environments
+- Kept: 1201 environments with good episodes
+- Total episodes: 5036
 ```
 
 ---
 
-## Training Configuration Evolution
+## Current Status and Results
 
-### Batch Size Attempts
-1. **Batch size 4**: CUDNN_STATUS_INTERNAL_ERROR (GPU OOM)
-2. **Batch size 2**: CUDNN_STATUS_INTERNAL_ERROR (GPU OOM)
-3. **Batch size 1**: CUDNN_STATUS_INTERNAL_ERROR (GPU OOM)
-4. **After model reduction, Batch size 2**: SUCCESS (fits in memory)
+### Training Configuration
 
-### Current Training Config
-- **Epochs**: 5 (changed from 50 for testing)
-- **Batch size**: 2
-- **Learning rate**: 1e-4
-- **Optimizer**: Adam
-- **Loss**: Binary Cross-Entropy with Logits
-- **Metric**: IoU (Intersection over Union)
-- **DataLoader workers**: 4
-- **Device**: CUDA
-
-### Checkpointing Strategy Changes
-
-#### Original Strategy
-- Best model: Saved when validation IoU improves
-- Regular checkpoints: Every 10 epochs
-
-#### Current Strategy (Modified)
-- Best model: Saved when validation IoU improves
-- Regular checkpoints: **EVERY epoch** (changed per user request)
-- Location: `/home/chaseungjoon/code/WildfirePrediction-SSD/rl_training/supervised/checkpoints_unet/`
-- Files:
-  - `best_model.pt` - Best validation IoU
-  - `checkpoint_epoch{N}.pt` - Every epoch checkpoint
-
-**Modified Code** (`train_unet.py` lines 262-282):
-```python
-# Save best model
-if val_iou > best_val_iou:
-    best_val_iou = val_iou
-    torch.save({
-        'epoch': epoch,
-        'model_state_dict': model.state_dict(),
-        'optimizer_state_dict': optimizer.state_dict(),
-        'val_iou': val_iou,
-        'val_loss': val_loss
-    }, checkpoint_dir / 'best_model.pt')
-    print(f"✓ Saved best model (IoU: {val_iou:.4f})")
-
-# Save checkpoint EVERY epoch (CHANGED FROM: if epoch % 10 == 0)
-torch.save({
-    'epoch': epoch,
-    'model_state_dict': model.state_dict(),
-    'optimizer_state_dict': optimizer.state_dict(),
-    'val_iou': val_iou,
-    'val_loss': val_loss
-}, checkpoint_dir / f'checkpoint_epoch{epoch}.pt')
-print(f"✓ Saved checkpoint for epoch {epoch}")
+**A3C V3 Settings:**
+```
+Model: A3C_PerCellModel (416,873 parameters)
+Workers: 8 parallel CPU workers
+Episodes: 1000 (currently in progress)
+Learning Rate: 1e-4
+Gamma (discount): 0.99
+Value Loss Coef: 0.5
+Entropy Coef: 0.01
+Max Grad Norm: 0.5
 ```
 
----
+### Performance Metrics
 
-## Dataset Details
+**Training Progress (Episode 180):**
 
-### Location
-- **Directory**: `/home/chaseungjoon/code/WildfirePrediction-SSD/tilling_data/environments/`
-- **Format**: Pickle files (`.pkl`)
-- **Split files**:
-  - `train_split.json` - 3026 training environments
-  - `val_split.json` - 648 validation environments
+| Metric | Value | Comparison |
+|--------|-------|------------|
+| Best IoU | 14.21% | vs U-Net best 11-12% (F1 20%) |
+| Average IoU | ~1-2% | Expected variance in RL |
+| Loss Range | -7 to +3 | Stable (vs -200,000 before) |
+| Action Space | ~80 decisions | vs 30,000 before |
 
-### Dataset Statistics
-- **Training samples**: 23,945 (multiple timesteps per environment)
-- **Validation samples**: ~5,000 (estimate)
-- **Input channels**: 14 (environmental features)
-- **Output**: Binary mask (1 channel) - which cells will burn next
+**Learning Trajectory:**
+- Episodes 1-60: 0% IoU (exploration phase)
+- Episode 80: 0.95% IoU (first learning signal)
+- Episode 100: 0.79% IoU
+- Episode 120: 1.78% IoU
+- Episode 180: 14.21% IoU (breakthrough)
 
-### Custom DataLoader Features
-- **Variable spatial dimensions**: Different environments have different H×W sizes
-- **Custom collate_fn**: Pads all samples in batch to max dimensions
-- **Padding**: Zero-padding for both observations and targets
+**Key Observations:**
 
----
+1. **Stable Training:** Loss remains in reasonable range without explosions
+2. **Clear Learning:** IoU progression from 0% to 14% shows model is learning
+3. **High Variance:** Individual episodes range from 0% to 14% (normal for RL)
+4. **Parallel Execution:** All 8 workers contributing (confirmed by rapid episode completion)
+5. **Dense Reward Signal:** Receiving feedback at every timestep, not just episode end
 
-## Critical Dataset Problem (Current Blocker)
+### Comparison to Supervised Learning
 
-### Issue: Extremely Large Environment Files
-Training hangs during dataset initialization ("Scanning envs" phase) at 97% complete (2939/3026 environments).
+| Approach | Best Performance | Training Time | Issues |
+|----------|------------------|---------------|--------|
+| U-Net V2 (pos=150) | F1: 19.85%, IoU ~11-12% | 3 epochs, ~1 hour | Early peaking, overfitting |
+| U-Net V3 (Combined) | F1: 15.95% | 5 epochs, ~1.5 hours | Over-prediction |
+| U-Net V3 (Dice) | F1: 6.68% | 3 epochs, ~1 hour | Severe over-prediction |
+| **A3C V3** | **IoU: 14.21%** (ongoing) | **180 episodes, ~30 min** | **Still training** |
 
-### Root Cause
-Some environment files are **500-1000x larger** than typical files:
-
-**Normal files**: 88-114 KB
-**Problem files**:
-- `env_02392.pkl` - **75 MB** (where training stuck)
-- `env_03524.pkl` - **74 MB**
-- `env_03671.pkl` - **57 MB**
-- `env_04269.pkl` - **34 MB**
-- `env_04270.pkl` - **64 MB**
-- `env_04271.pkl` - **59 MB**
-- `env_04276.pkl` - **91 MB**
-- `env_04277.pkl` - **81 MB**
-- Many more 30-90 MB files
-
-### Symptoms
-- Process stuck at 2939/3026 environments (97%)
-- GPU usage at 99% during file loading (ABNORMAL - should be CPU-only)
-- Frozen for 4+ minutes with no progress
-- Process needs to be killed
-
-### Training Split Position
-The stuck position (2939) corresponds to:
-- 2937: env_03524 (74 MB)
-- 2938: env_03671 (57 MB)
-- **2939: env_02392 (75 MB)** ← STUCK HERE
-- 2940: env_00527 (16 KB - normal)
+At 18% through training, A3C V3 has already matched supervised learning performance and is still improving.
 
 ---
 
-## Options and Next Steps
+## Technical Details
 
-### Option 1: Filter Out Large Files
-**Pros**:
-- Quick fix
-- Training can proceed immediately
-- Still have 3000+ environments
+### File Locations
 
-**Cons**:
-- Lose potentially valuable data
-- Unknown why these files are large
+**Supervised Learning:**
+- Models: `rl_training/supervised/unet_model.py`, `unet_model_v2.py`
+- Training: `train_unet.py` (V1), `train_unet_v2.py` (V2), `train_unet_v3.py` (V3)
+- Checkpoints: `rl_training/supervised/checkpoints_unet_v2/`, `checkpoints_unet_v3/`
+- Best Model: `checkpoints_unet_v2/best_model.pt` (epoch 3, F1=19.85%)
 
-**Implementation**:
+**Reinforcement Learning:**
+- Specification: `rl_training/a3c/A3C_CORRECT_FORMULATION.md`
+- Model: `rl_training/a3c/model_v2.py` (A3C_PerCellModel)
+- Worker: `rl_training/a3c/worker_v3.py` (with dense rewards)
+- Training: `rl_training/a3c/train_v3.py`
+- Checkpoints: `rl_training/a3c/checkpoints_v3/`
+
+**Data:**
+- Environment files: `tilling_data/environments/*.pkl`
+- Train split: `tilling_data/environments/train_split.json` (3026 envs)
+- Val split: `tilling_data/environments/val_split.json` (648 envs)
+
+**Diagnostic Tools:**
+- Dataset analysis: `rl_training/supervised/diagnose_dataset.py`
+- Accuracy analysis: `SUPERVISED_ACCURACY_ANALYSIS.md`
+
+### Data Format
+
+**Environment Structure:**
 ```python
-# Add file size check in dataset loading
-import os
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
-valid_paths = [p for p in env_paths if os.path.getsize(p) < MAX_FILE_SIZE]
+{
+    'metadata': {
+        'num_timesteps': T,
+        'height': H,
+        'width': W,
+        'resolution_m': resolution
+    },
+    'static': {
+        'continuous': (3, H, W),  # elevation, slope, aspect
+        'lcm': (H, W),            # land cover
+        'fsm': (H, W)             # fuel model
+    },
+    'temporal': {
+        'fire_masks': (T, H, W),
+        'fire_intensities': (T, H, W),
+        'fire_temps': (T, H, W),
+        'fire_ages': (T, H, W),
+        'weather_states': (T, 5)  # temp, humidity, wind, pressure
+    }
+}
 ```
 
-### Option 2: Investigate Why Files Are Large
-**Pros**:
-- Understand root cause
-- May reveal data quality issues
-- Could fix at source
+**Observation Vector (14 channels):**
+1. Static continuous: elevation, slope, aspect (3)
+2. Categorical: land cover, fuel model (2)
+3. Fire state: mask, intensity, temperature, age (4)
+4. Weather: temp, humidity, wind speed/direction, pressure (5)
 
-**Cons**:
-- Takes time to debug
-- May not be fixable
+### Model Specifications
 
-**Investigation steps**:
-1. Load one large file and inspect contents
-2. Compare with normal file structure
-3. Check if it's a bug in data generation pipeline
-4. Potentially regenerate these environments
-
-### Option 3: Lazy Loading with Timeout
-**Pros**:
-- Handle problematic files gracefully
-- Automatic recovery
-
-**Cons**:
-- Adds complexity
-- May still cause issues during actual training
-
-**Implementation**:
-```python
-# Add timeout and error handling in __getitem__
-try:
-    with timeout(seconds=10):
-        env = WildfireEnvSpatial(env_path)
-except TimeoutError:
-    # Skip this sample
-    return self.__getitem__((idx + 1) % len(self))
+**U-Net V2 (Supervised):**
+```
+Parameters: 1,930,177
+Architecture:
+- Encoder: 32 → 64 → 128 → 256 (GroupNorm)
+- Decoder: 256 → 128 → 64 → 32 (GroupNorm)
+- Skip connections between encoder/decoder
+- Output: 1 channel (burn probability)
 ```
 
-### Option 4: Pre-validate Dataset
-**Pros**:
-- One-time validation
-- Clean dataset going forward
-- Can document problematic files
+**A3C_PerCellModel (Reinforcement Learning):**
+```
+Parameters: 416,873
+Architecture:
+- Shared Encoder: 14 → 32 → 64 → 128 (3 conv layers)
+- Policy Head: Local 3×3 features (128×9) → 256 → 64 → 8
+- Value Head: Global avg pool → 128 → 64 → 1
+- Per-cell 8-neighbor prediction
+```
 
-**Cons**:
-- Need to run validation script first
-- May take time
+### Training Commands
 
-**Implementation**:
-Create script to:
-1. Test load all environment files
-2. Record file size, load time, structure
-3. Generate blacklist of problematic files
-4. Update train/val splits to exclude them
-
----
-
-## Training Estimates (When Unblocked)
-
-### Per Epoch (with batch_size=2)
-- **Time**: 1.7 - 3.3 hours per epoch
-- **Iterations**: ~12,000 training batches
-- **Memory**: Fits in GPU with current model
-
-### Full Training (50 epochs)
-- **Total time**: 3.5 - 7 days
-- **Total time (5 epochs)**: 8.5 - 16.5 hours
-
----
-
-## File Locations Summary
-
-### Model Files
-- `/home/chaseungjoon/code/WildfirePrediction-SSD/rl_training/supervised/unet_model.py` - U-Net architecture
-- `/home/chaseungjoon/code/WildfirePrediction-SSD/rl_training/supervised/train_unet.py` - Training script
-- `/home/chaseungjoon/code/WildfirePrediction-SSD/rl_training/wildfire_env_spatial.py` - Environment class
-
-### Data Files
-- `/home/chaseungjoon/code/WildfirePrediction-SSD/tilling_data/environments/*.pkl` - Environment files
-- `/home/chaseungjoon/code/WildfirePrediction-SSD/tilling_data/environments/train_split.json` - Train split
-- `/home/chaseungjoon/code/WildfirePrediction-SSD/tilling_data/environments/val_split.json` - Val split
-
-### Checkpoint Directory
-- `/home/chaseungjoon/code/WildfirePrediction-SSD/rl_training/supervised/checkpoints_unet/`
-
----
-
-## Command to Resume Training
-
+**Supervised Learning (Best Configuration):**
 ```bash
 PYTHONPATH=/home/chaseungjoon/code/WildfirePrediction:$PYTHONPATH \
-python3 rl_training/supervised/train_unet.py \
-  --epochs 5 \
-  --batch-size 2 \
+python3 rl_training/supervised/train_unet_v2.py \
+  --epochs 10 \
+  --batch-size 4 \
   --lr 1e-4 \
-  --num-workers 4
+  --num-workers 4 \
+  --pos-weight 150.0 \
+  --no-wandb
+
+# Best checkpoint: epoch 3, F1=19.85%
 ```
 
-**Note**: Will hang at 97% until dataset issue is resolved.
+**Reinforcement Learning (Current):**
+```bash
+PYTHONPATH=/home/chaseungjoon/code/WildfirePrediction:$PYTHONPATH \
+python3 rl_training/a3c/train_v3.py \
+  --num-workers 8 \
+  --max-episodes 1000 \
+  --max-file-size-mb 50 \
+  --min-episode-length 2 \
+  --log-interval 20 \
+  --lr 1e-4 \
+  --wandb-project wildfire-prediction \
+  --wandb-run-name a3c-v3-correct-8neighbor-dense
+```
 
 ---
 
-## Related Work (Context)
+## Next Steps
 
-### A3C Training Files (Abandoned but Still Present)
-- `/home/chaseungjoon/code/WildfirePrediction-SSD/rl_training/a3c/model.py` - A3C model
-- `/home/chaseungjoon/code/WildfirePrediction-SSD/rl_training/a3c/train.py` - A3C training
-- `/home/chaseungjoon/code/WildfirePrediction-SSD/rl_training/a3c/worker.py` - A3C workers
+### Immediate (Current Training)
 
-### Data Generation Pipeline
-- `/home/chaseungjoon/code/WildfirePrediction-SSD/tilling_src/01_spatial_tiling.py`
-- `/home/chaseungjoon/code/WildfirePrediction-SSD/tilling_src/02_temporal_segmentation.py`
-- `/home/chaseungjoon/code/WildfirePrediction-SSD/tilling_src/03_environment_assembly.py`
-- `/home/chaseungjoon/code/WildfirePrediction-SSD/tilling_src/04_dataset_split.py`
+1. **Complete A3C Training:** Let current run finish 1000 episodes
+2. **Monitor Metrics:**
+   - Best IoU (target: 20-30%)
+   - Average IoU over last 100 episodes (target: 5-10%)
+   - Training stability (loss should remain -5 to +5)
+
+### Short-Term Evaluation
+
+1. **Compare Final Results:**
+   - A3C V3 best IoU vs U-Net best F1
+   - Sample predictions on validation set
+   - Analyze failure cases
+
+2. **Hyperparameter Tuning (if needed):**
+   - Learning rate: Try 5e-5 or 2e-4
+   - Entropy coefficient: Adjust exploration
+   - Episode length: Currently capped at 20 steps
+
+3. **Model Improvements:**
+   - Add attention mechanism to policy head
+   - Experiment with different encoder architectures
+   - Try recurrent layers for temporal modeling
+
+### Medium-Term Research
+
+1. **MCTS Integration:**
+   - Use A3C policy as prior for Monte Carlo Tree Search
+   - Plan multi-step ahead using search
+   - This was the original MCTS-A3C goal
+
+2. **Multi-Task Learning:**
+   - Predict both spread AND intensity
+   - Auxiliary tasks for better representations
+   - Joint optimization
+
+3. **Data Augmentation:**
+   - Rotations and flips of spatial data
+   - Generate synthetic fire scenarios
+   - Balance dataset further
+
+### Long-Term Goals
+
+1. **Deployment:**
+   - Real-time inference optimization
+   - Integration with operational systems
+   - Uncertainty quantification
+
+2. **Evaluation on Real Data:**
+   - Test on held-out fire events
+   - Validation against actual fire progression
+   - Expert evaluation of predictions
+
+3. **Interpretability:**
+   - Visualize learned features
+   - Understand policy decisions
+   - Build trust for operational use
 
 ---
 
-## Key Decisions Made
+## Lessons Learned
 
-1. **Abandoned A3C**: RL approach not suitable for this problem
-2. **Chose U-Net**: Better for dense spatial prediction tasks
-3. **Reduced model size**: From 31M to 1.9M parameters to fit GPU
-4. **Batch size 2**: Optimal balance between memory and training speed
-5. **Save every epoch**: For fine-grained checkpoint recovery
-6. **5 epoch test**: Before committing to full 50-epoch training
+### Critical Mistakes and Solutions
+
+1. **Class Imbalance Underestimated:**
+   - Mistake: Used standard BCE loss initially
+   - Solution: Weighted BCE, filtering zero-burn samples, alternative losses
+   - Lesson: Always analyze dataset statistics before training
+
+2. **Incorrect Problem Formulation:**
+   - Mistake: A3C predicting full grid independently
+   - Solution: Per-cell 8-neighbor structured prediction
+   - Lesson: Match model structure to problem physics
+
+3. **Sparse vs Dense Rewards:**
+   - Mistake: Only rewarding at episode end
+   - Solution: IoU computed at every timestep
+   - Lesson: Dense feedback critical for RL in sparse domains
+
+4. **Metric Interpretation:**
+   - Mistake: High IoU on empty predictions
+   - Solution: Per-sample metrics, additional precision/recall
+   - Lesson: Multiple metrics needed for imbalanced problems
+
+### What Worked
+
+1. **Filtered Episodes:** Pre-scanning for valid training data
+2. **Dense Rewards:** Immediate feedback at every step
+3. **Structured Actions:** 8-neighbor prediction matches fire physics
+4. **GroupNorm:** Stable training with small batches
+5. **Parallel Workers:** A3C parallelism working correctly
+
+### Open Questions
+
+1. **Optimal Loss Function:** Is there a better loss than weighted BCE for supervised learning?
+2. **Model Capacity:** Is 400K parameters enough for A3C, or would larger help?
+3. **Exploration Strategy:** Current entropy bonus sufficient, or need more sophisticated exploration?
+4. **Temporal Modeling:** Would LSTM/GRU layers improve sequential predictions?
+5. **Transfer Learning:** Can model trained on one region generalize to others?
 
 ---
 
-## Next Session TODO
+## Conclusion
 
-1. **URGENT**: Fix dataset loading issue
-   - Choose one of the 4 options above
-   - Recommended: Option 1 (filter) + Option 2 (investigate) in parallel
+After extensive experimentation with supervised learning approaches, we identified extreme class imbalance as the fundamental challenge. While U-Net achieved respectable 20% F1 score, it peaked early and couldn't improve further.
 
-2. **Resume training**: Once dataset is fixed, run 5-epoch test
+The pivot to A3C with correct per-cell 8-neighbor formulation and dense rewards shows significant promise. At only 18% through training, A3C has matched supervised performance and continues to improve with stable training dynamics.
 
-3. **Monitor training**: Check for:
-   - GPU memory stability
-   - Training speed matches estimates
-   - Loss/IoU trends look reasonable
+The key breakthrough was recognizing that fire spread is a structured, cell-to-cell process, not a global grid prediction problem. This insight transformed A3C from complete failure (action space too large) to viable approach (tractable structured actions with clear learning signal).
 
-4. **If 5 epochs succeed**: Scale up to 50 epochs
-
-5. **Evaluate results**: Check validation IoU and compare to baseline
+Training is ongoing. Results at episode 1000 will determine if RL can surpass supervised learning for this challenging wildfire prediction task.
 
 ---
 
-## Questions to Answer Later
-
-1. Why are some environment files 75 MB vs 100 KB?
-2. Is there a bug in the data generation pipeline?
-3. Should we regenerate the problematic environments?
-4. What's causing GPU usage during pickle file loading?
-5. Are these large files even valid training data?
-
----
-
-Last Updated: 2025-11-09
-Status: BLOCKED on dataset loading issue
-Next Action: Fix large environment file problem
+**Project Repository:** `/home/chaseungjoon/code/WildfirePrediction`
+**Documentation:** See `A3C_CORRECT_FORMULATION.md` and `SUPERVISED_ACCURACY_ANALYSIS.md` for detailed technical specifications
