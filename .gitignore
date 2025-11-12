@@ -4,12 +4,13 @@
 .claude
 .venv
 ._*
+.wandbignore
 
 # directories
 data
 tilling_data
 rl_training/supervised/checkpoints_unet/best_model
-
+wandb
 
 # files
 *.html
