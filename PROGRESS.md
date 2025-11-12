@@ -7,8 +7,8 @@ Training spatial wildfire prediction models using tilled satellite data. Abandon
 
 ## Model Architecture Evolution
 
-### A3C (Abandoned)
-- **Status**: Abandoned due to poor performance
+### A3C (Temporarily abandoned)
+- **Status**: Temporarily abandoned due to poor performance, can revisit later
 - **Architecture**: Actor-Critic with spatial fire spread prediction
 - **Issues**:
   - Poor convergence
