@@ -30,27 +30,11 @@
 
 ---
 
-> **Step 2.5: V3 Model + 2 Workers + Min-Len 4**
->
->
-> **Command:**
-> ```bash
-> PYTHONPATH=/home/chaseungjoon/code/WildfirePrediction:$PYTHONPATH \
-> python3 rl_training/a3c/train_v3.py \
->   --num-workers 2 \
->   --max-episodes 1000 \
->   --max-file-size-mb 50 \
->   --min-episode-length 4 \
->   --log-interval 20 \
->   --lr 7e-5 \
->   --entropy-coef 0.015 \
->   --wandb-project wildfire-prediction \
->   --wandb-run-name a3c-v4-mel4-workers2
-> ```
+> **Step 2.5: V3 Model + 2 Workers + Min-Len 4 (✓ COMPLETED)**
 >
 > **Why:** Test if fewer workers help with improvement with overfitting issue
 >
-> **Result:** 
+> **Result:** IoU under 5% after 500 episodes - fewer workers worsened overfitting
 
 ---
 

@@ -10,14 +10,14 @@
 ## Best Scores Summary
 
 ### Supervised Learning (F1 Score)
-> **U-Net** V2: 0.1985 (@epoch 3)
+> **U-Net** V2 : 0.1985 (@epoch 3)
 
 ### Reinforcement Learning (A3C) (IoU Score)
 > **V3** --min-episode-length **2**, --num-workers **8** : **0.094**
 >
 > **V3** --min-episode-length **3**, --num-workers **8** : **0.1786** (@episode 305)
 >
-> **V3** --min-episode-length **4**, --num-workers **8** : **0.3214** (@episode 960)
+> **V3** --min-episode-length **4**, --num-workers **8** : **0.4000** (@episode 1918)
 > 
 > **V3** --min-episode-length **5**, --num-workers **8** : **0.1165** (@episode 428)
 
