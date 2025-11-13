@@ -4,7 +4,7 @@
 - **Breakthrough:** 4 workers (not 8) is the sweet spot - prevents memory bottleneck
 - **V2 Model Completed:** 40.91% IoU at episode 731 (27% improvement over 8 workers)
 - **Best Config:** min-episode-length 4 (502 episodes), lr 7e-5, entropy 0.015, 4 workers
-- **Checkpoint:** `checkpoints_v3/251112-2206/best_model.pt`
+- **Checkpoint:** `checkpoints_v3/`
 
 ---
 
