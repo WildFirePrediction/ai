@@ -48,6 +48,18 @@
 > 
 > **Result** : 10% F1 Score
 
+
+> **Step 3.5: V5 (4-Neighbor Multi-Task) + 8 Workers + Min-Len 4**
+>
+> **Why:**
+> - Simpler action space: 4 neighbors (N,E,S,W) vs 8 - diagonal spread likely noise
+> - Multi-task learning: burn + intensity + temperature prediction - richer gradients
+> - Better metrics: F1, precision, recall (not just IoU)
+> - Inspired by MCTS-A3C (87% baseline)
+> 
+> **Result** : 12% F1 Score
+
+
 ---
 
 ## Key Insights
