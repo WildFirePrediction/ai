@@ -26,6 +26,7 @@
 >
 > **V3** --min-episode-length **4**, --num-workers **2** : **0.0569** (@episode 76)
 
+> **V5** --min-episode-length **4**, --num-workers **4** : **0.1000** (@episode 831)
 
 ---
 
