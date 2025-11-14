@@ -51,7 +51,7 @@ PYTHONPATH=/home/chaseungjoon/code/WildfirePrediction:$PYTHONPATH \
 python3 rl_training/a3c/train_v6.py \
   --num-workers 4 \
   --max-episodes 50 \
-  --lr 7e-5 \
+  --lr 9e-5 \
   --min-episode-length 4 \
   --no-wandb
 ```
