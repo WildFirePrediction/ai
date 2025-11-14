@@ -24,7 +24,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from wildfire_env_spatial import WildfireEnvSpatial
 from a3c.model_v6 import A3C_PerCellModel_V6
-from a3c.augmentation import random_augmentation, augment_observation, augment_mask
+from a3c.augmentation import random_augmentation, augment_observation, augment_mask, inverse_augment_mask
 
 
 def compute_iou(pred, target):
@@ -103,12 +103,14 @@ def worker_process_v6(worker_id, shared_model, optimizer, filtered_episodes, con
         try:
             env = WildfireEnvSpatial(env_path)
         except Exception as e:
-            print(f"[Worker {worker_id}] Error loading env: {e}")
+            print(f"[Worker {worker_id}] Error loading env: {e}", flush=True)
             continue
 
         # Sample random augmentation (PHASE 1 IMPROVEMENT)
         aug_params = random_augmentation()
         use_augmentation = config.get('use_augmentation', True)
+
+        print(f"[Worker {worker_id}] Loaded env, starting episode (aug: k_rot={aug_params['k_rot']}, flip_h={aug_params['flip_h']}, flip_v={aug_params['flip_v']})", flush=True)
 
         # Fast-forward to start_t
         obs, info = env.reset()
@@ -147,9 +149,15 @@ def worker_process_v6(worker_id, shared_model, optimizer, filtered_episodes, con
                     state_tensor, fire_mask
                 )
 
-            # Convert action to numpy (inverse augmentation NOT needed for environment step)
-            # The environment doesn't care about augmentation, we just store augmented states
-            action_np = action_grid.numpy()  # (H, W)
+            # Convert action to numpy
+            action_augmented = action_grid.numpy()  # (H', W') in augmented space
+
+            # Inverse-augment action back to original space before env.step()
+            # The environment expects actions in ORIGINAL coordinate space!
+            if use_augmentation:
+                action_np = inverse_augment_mask(action_augmented, **aug_params)
+            else:
+                action_np = action_augmented
 
             # Step environment - GET DENSE REWARD!
             next_obs, reward, done, info = env.step(action_np)

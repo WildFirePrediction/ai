@@ -6,7 +6,7 @@ Store and replay high-quality episodes to prevent catastrophic forgetting.
 import numpy as np
 from pathlib import Path
 from collections import deque
-import threading
+import multiprocessing as mp
 
 
 class EpisodeReplayBuffer:
@@ -25,7 +25,7 @@ class EpisodeReplayBuffer:
         self.capacity = capacity
         self.min_iou_threshold = min_iou_threshold
         self.buffer = []  # List of (env_path, start_t, max_length, iou)
-        self.lock = threading.Lock()
+        self.lock = mp.Lock()
 
         self.total_added = 0
         self.total_rejected = 0
