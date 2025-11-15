@@ -1,4 +1,4 @@
-# Wildfire Prediction Model Improvement Options
+# Wildfire Prediction Model Roadmap
 
 ## Current Status
 - **Best Model:** A3C V3 (8-neighbor, 417K params)
@@ -10,7 +10,7 @@
 
 ## Phase 1: Quick Wins (Target: 45-50% IoU, 1-3 days)
 
-### 1.1 Data Augmentation ⭐ HIGH IMPACT
+### 1.1 Data Augmentation 
 **Problem:** Only 502 high-quality episodes available
 
 **Solution:**
@@ -29,10 +29,11 @@ def augment_episode(obs, fire_mask, burn_mask):
 **Expected Gain:** +5-7% IoU
 **Difficulty:** Easy
 **Status:** ✅ Implemented in V6
+**Result:** Modest gain to 36.36% IoU
 
 ---
 
-### 1.2 Experience Replay Buffer ⭐ HIGH IMPACT
+### 1.2 Experience Replay Buffer
 **Problem:** Catastrophic forgetting - model forgets good episodes
 
 **Solution:**
@@ -56,6 +57,7 @@ class ReplayBuffer:
 **Expected Gain:** +3-5% IoU (reduces forgetting)
 **Difficulty:** Easy
 **Status:** ✅ Implemented in V6
+**Result:** Modest gain to 36.36% IoU
 
 ---
 
@@ -73,23 +75,9 @@ class ReplayBuffer:
 
 ---
 
-### 1.4 Gradient Clipping Optimization
-**Current:** Max grad norm = 0.5
-
-**Options:**
-- Try 1.0 (less aggressive clipping)
-- Try adaptive clipping based on loss magnitude
-- Monitor gradient norms during training
-
-**Expected Gain:** +1-2% IoU (better gradient flow)
-**Difficulty:** Trivial
-**Status:** Can tune in V6
-
----
-
 ## Phase 2: Architecture Enhancements (Target: 50-60% IoU, 1-2 weeks)
 
-### 2.1 Spatial Attention Mechanism ⭐ HIGH IMPACT
+### 2.1 Spatial Attention Mechanism
 **Problem:** Model treats all regions equally, doesn't focus on fire front
 
 **Solution:**
@@ -113,11 +101,11 @@ class SpatialAttention(nn.Module):
 
 **Expected Gain:** +5-8% IoU
 **Difficulty:** Medium
-**Status:** Planned for V7
+**Status:** Planned for V8
 
 ---
 
-### 2.2 Temporal Context (LSTM/GRU) ⭐ CRITICAL MISSING
+### 2.2 Temporal Context (LSTM/GRU)
 **Problem:** Model only sees current timestep, ignores fire history
 
 **Current:** `obs_t` → policy
@@ -138,7 +126,7 @@ class SpatialAttention(nn.Module):
 3. **Reduced encoder capacity**: Cut from 128 to 64 channels, lost representation power
 4. **Window too small**: 3 timesteps insufficient for meaningful temporal patterns
 
-**Correct Implementation (V7.5 Plan):**
+**Correct Implementation (V7.1 Plan):**
 ```python
 class TemporalEncoder(nn.Module):
     def __init__(self, feature_dim=128):  # Keep 128 channels!
@@ -179,7 +167,7 @@ class TemporalEncoder(nn.Module):
 
 **Expected Gain:** +7-10% IoU (if done correctly)
 **Difficulty:** Medium
-**Status:** V7 failed, needs V7.5 with correct LSTM implementation
+**Status:** V7 failed, needs V7.1 with correct LSTM implementation
 
 ---
 
@@ -201,7 +189,7 @@ nn.Conv2d(128, 128, kernel_size=3, dilation=4)  # 9x9 effective
 
 **Expected Gain:** +4-6% IoU
 **Difficulty:** Medium
-**Status:** Planned for V8
+**Status:** -
 
 ---
 
@@ -665,7 +653,7 @@ Baseline: V3 without augmentation
   - Mistake: Reduced encoder capacity (64 vs 128 channels)
   - Lesson: Temporal modeling needs recurrent state
 
-### 📋 Next Up (V7.5 or V8)
+### 📋 Next Up (V7.1 or V8)
 - Temporal context with LSTM (not 3D conv!)
 - Spatial attention mechanism
 - Channel attention
@@ -723,7 +711,7 @@ Baseline: V3 without augmentation
 
 1. **Episode Quality > Quantity:** 502 good episodes beats 5036 mixed episodes
 2. **Temporal Context is Critical:** Fire spread is inherently sequential
-3. **⚠️ Use Correct Architecture:** LSTM/GRU for temporal (NOT 3D conv) - V7 proved this
+3. **Use Correct Architecture:** LSTM/GRU for temporal (NOT 3D conv) - V7 proved this
 4. **Don't Sacrifice Capacity:** Keep full encoder (128 channels), performance > efficiency
 5. **Attention Helps:** Fire front is sparse, attention can focus computation
 6. **Augmentation is Free Performance:** Rotation/flip invariance is guaranteed

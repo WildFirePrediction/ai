@@ -32,7 +32,7 @@
 
 > **V6** --min-episode-length **4**, --num-workers **4** : **0.3636** (@episode 761)
 
-> **V7** (3D Conv) --min-episode-length **4**, --num-workers **4** : **0.0813** (@episode 560) ⚠️ FAILED (-80% vs V3)
+> **V7** --min-episode-length **4**, --num-workers **4** : **0.0813** (@episode 560)
 
 ---
 
