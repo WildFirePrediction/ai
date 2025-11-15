@@ -30,6 +30,8 @@
 >
 > **V5** --min-episode-length **4**, --num-workers **8** : **0.1242** (@episode 1790)
 
+> **V6** --min-episode-length **4**, --num-workers **4** : **0.3636** (@episode 761)
+
 ---
 
 ## RL
