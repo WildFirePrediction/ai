@@ -56,9 +56,34 @@
 > - Multi-task learning: burn + intensity + temperature prediction - richer gradients
 > - Better metrics: F1, precision, recall (not just IoU)
 > - Inspired by MCTS-A3C (87% baseline)
-> 
+>
 > **Result** : 12% F1 Score
 
+---
+
+> **Step 4: V7 (Temporal 3D Conv) + 4 Workers + Min-Len 4 (✓ COMPLETED - FAILED)**
+>
+> **Why:**
+> - Add temporal context (last 3 timesteps) to capture fire velocity/acceleration
+> - Target: 47-50% IoU improvement over V3's 40.91%
+>
+> **Architecture:**
+> - Lighter CNN encoder: 14 → 32 → 64 channels (vs V3's 128)
+> - 3D Conv for temporal modeling (changed from planned LSTM)
+> - Window size: 3 timesteps
+> - ~450K params vs V3's 417K
+>
+> **Result: CATASTROPHIC FAILURE**
+> - Best IoU: **8.13%** at episode 560
+> - **-80% degradation** vs V3 baseline (40.91% → 8.13%)
+>
+> **Why It Failed:**
+> 1. Reduced encoder capacity (64 vs 128 channels) - lost representation power
+> 2. 3D Conv wrong tool for temporal memory (needs LSTM state for velocity tracking)
+> 3. Window size too small (3 timesteps insufficient)
+> 4. Optimized for "lighter" model instead of better temporal modeling
+>
+> **Key Lesson:** Temporal modeling requires recurrent architecture (LSTM/GRU) with hidden state, not 3D convolutions. Don't sacrifice encoder capacity for efficiency.
 
 ---
 
@@ -74,25 +99,29 @@
 - ~~8 workers~~ - causes memory explosion with any model, overfitting worsens
 - ~~min-episode-length 5-6~~ - too sparse (90 episodes), not enough data for 4 workers
 - ~~Deep 5-layer model~~ - 4M params too heavy for CPU training
+- ~~3D Conv for temporal modeling~~ - V7 failed catastrophically (8.13% IoU vs 40.91%)
+- ~~Reducing encoder capacity~~ - Don't sacrifice 128-channel layer for "efficiency"
 
 ---
 
 ## Success Criteria
 
-- **V3 Target:** 40-50% IoU (Achieved)
+- **V3 Target:** 40-50% IoU (✓ Achieved: 40.91%)
 - ~~**Medium Target:** 45-55% IoU~~ 10% IoU (overfitting issue)
-- **V5 Target:** 50-60% IoU
+- **V5 Target:** 50-60% IoU (Failed: 12% F1)
+- **V7 Target:** 47-50% IoU (Failed catastrophically: 8.13% IoU, -80% vs V3)
 - **Production Goal:** 70% IoU (may need ensemble/attention after this)
 
 ---
 
 ## Model Specs
 
-| Model  | Params | Architecture | Key Feature |
-|--------|--------|--------------|-------------|
-| V3     | 417K | 3-layer (32→64→128) | Baseline, proven stable |
-| Medium | 935K | 3-layer (48→96→192) + GroupNorm | 2.2x capacity, CPU-friendly |
-| V5     | 497K | 3-layer + multi-task | 4-neighbor + burn/intensity/temp |
+| Model  | Params | Architecture | Key Feature | Result |
+|--------|--------|--------------|-------------|--------|
+| V3     | 417K | 3-layer (32→64→128) | Baseline, proven stable | ✅ 40.91% IoU |
+| Medium | 935K | 3-layer (48→96→192) + GroupNorm | 2.2x capacity, CPU-friendly | ❌ <10% IoU (overfitting) |
+| V5     | 497K | 3-layer + multi-task | 4-neighbor + burn/intensity/temp | ❌ 12% F1 |
+| V7     | ~450K | 2-layer (32→64) + 3D Conv temporal | Window=3, lighter encoder | ❌ 8.13% IoU (-80% vs V3) |
 
 ---
 
@@ -139,4 +168,4 @@
 
 ---
 
-**Last Updated:** 2025-11-12
+**Last Updated:** 2025-11-16 (V7 Postmortem)

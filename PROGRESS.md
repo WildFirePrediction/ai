@@ -32,6 +32,8 @@
 
 > **V6** --min-episode-length **4**, --num-workers **4** : **0.3636** (@episode 761)
 
+> **V7** (3D Conv) --min-episode-length **4**, --num-workers **4** : **0.0813** (@episode 560) ⚠️ FAILED (-80% vs V3)
+
 ---
 
 ## RL
@@ -63,6 +65,108 @@ Reward: Sparse - only at episode end
 - IoU: 0.0001% (essentially zero)
 - Loss: -180,000 to -860,000 (unstable)
 - Learning: None
+
+---
+
+### A3C V7: Temporal Context with 3D Convolutions - FAILED
+
+**Goal:** Add temporal context to V3 (40.91% IoU) → Target 47-50% IoU
+
+**Problem Formulation:**
+```
+State: (B, 3, 14, H, W) - last 3 timesteps
+Action: Same as V3 - 8-neighbor prediction per burning cell
+Reward: Dense IoU at every timestep
+Temporal Modeling: 3D Convolution (changed from planned LSTM)
+```
+
+**Architecture Changes from V3:**
+
+1. **Lighter CNN Encoder** (MISTAKE #1)
+   - V3: 14 → 32 → 64 → 128 channels
+   - V7: 14 → 32 → 64 channels (NO 128!)
+   - Rationale: "3D conv will compensate" - it didn't
+
+2. **Temporal 3D Convolution** (MISTAKE #2)
+   - Original plan: 2-layer LSTM (128 hidden dim)
+   - Actual: 3D Conv layers (64 → 96 → 128)
+   - Changed because: "MUCH lighter than LSTM!"
+   - Problem: 3D convs don't capture temporal dynamics like LSTM
+
+3. **Temporal Window**
+   - Window size: 3 timesteps
+   - Padding: Repeat first observation for t < 3
+   - Memory: 3x feature maps (42 vs 14 in V3)
+
+4. **Same Policy/Value Heads as V3**
+   - Policy: Per-cell 8-neighbor prediction
+   - Value: Global average pooling + FC
+
+**Training Configuration:**
+```
+Workers: 4 (same as V3)
+Learning rate: 7e-5 (same as V3)
+Entropy coef: 0.015 (same as V3)
+Min episode length: 4 (502 filtered episodes)
+Max episodes: 5000
+Window size: 3 timesteps
+```
+
+**Results: CATASTROPHIC FAILURE**
+
+| Metric | V7 Result | V3 Baseline | Performance |
+|--------|-----------|-------------|-------------|
+| **Best IoU** | **8.13%** | **40.91%** | **-80% degradation** |
+| Episode | 560 | 731 | - |
+| Model params | ~450K | 417K | +8% |
+| Training time | ~1 hour | ~1 hour | Same |
+
+**Why It Failed So Badly:**
+
+1. **Reduced Feature Capacity**
+   - Cut 128-channel layer to save computation
+   - Lost critical representation power
+   - 3D conv couldn't compensate for weaker encoder
+
+2. **3D Conv vs LSTM Trade-off**
+   - 3D convs: Capture spatial-temporal patterns in receptive field
+   - LSTMs: Capture long-term temporal dependencies and state
+   - Fire spread needs MEMORY (velocity, acceleration) not just local patterns
+   - 3D conv was wrong tool for this task
+
+3. **Optimization Issues**
+   - 3x memory usage (temporal window)
+   - More parameters but worse performance
+   - Gradients likely had trouble flowing through 3D conv layers
+
+4. **Window Size Too Small**
+   - 3 timesteps insufficient to learn fire velocity/acceleration
+   - Need 5-7 timesteps to see meaningful temporal patterns
+
+5. **Wrong Optimization Target**
+   - Optimized for "lighter" model
+   - Should have optimized for "better temporal modeling"
+   - Penny-wise, pound-foolish
+
+**Critical Insights:**
+
+- **Temporal modeling needs STATE**: LSTM/GRU maintain hidden state, 3D conv doesn't
+- **Don't sacrifice encoder capacity**: The 128-channel layer in V3 was critical
+- **Memory is a feature, not a bug**: LSTM's state memory is exactly what we need
+- **"Lighter" doesn't mean "better"**: Performance > efficiency at this stage
+
+**What Should Have Been Done (V7.5 Plan):**
+
+1. **Keep full V3 encoder** (32 → 64 → 128)
+2. **Use 2-layer LSTM** as originally planned (not 3D conv)
+3. **Increase window size** to 5 timesteps (not 3)
+4. **Add layer norm** to stabilize LSTM training
+5. **Hybrid approach**: CNN encoder → LSTM temporal → V3 heads
+
+**Expected params for correct V7:**
+- V3 encoder: ~350K params
+- 2-layer LSTM (128 hidden): ~130K params
+- Total: ~480K params (worth it for temporal modeling)
 
 ---
 
@@ -184,8 +288,9 @@ Max Grad Norm: 0.5
 | A3C V3 (min-len 3)                | IoU: 17.86%             | 1000 episodes, ~1 hour | Stable, some forgetting after peak         |
 | **A3C V3 (min-len 4)**            | **IoU: 32.14%**         | **1000 episodes, ~1 hour** | **Very stable, no forgetting**             |
 | **A3C V3 (min-len 4, 4 workers)** | **IoU: 40.91%**         | **1000 episodes, ~1 hour** | **Fixes overfitting issue with 8 workers** |
+| A3C V7 (3D Conv, 4 workers)       | IoU: 8.13%              | 560 episodes, ~1 hour | **FAILED: -80% vs V3, wrong architecture** |
 
-A3C V3 with episode quality filtering now achieves 32.14% IoU, nearly 3x better than supervised learning's best (11-12% IoU equivalent). The trend suggests 70% IoU is achievable through continued filtering and architecture improvements.
+A3C V3 with episode quality filtering achieves 40.91% IoU, nearly 4x better than supervised learning's best (11-12% IoU equivalent). V7's failure demonstrates that temporal modeling requires proper recurrent architecture (LSTM/GRU), not 3D convolutions.
 
 ---
 
@@ -298,6 +403,10 @@ A3C V3 with episode quality filtering now achieves 32.14% IoU, nearly 3x better 
 3. **Larger model (935K params):** Overfitting
 4. **min-len 5+:** Too sparse, not enough data
 5. **Full grid prediction:** 30K action space failed
+6. **V7 (3D Conv temporal):** -80% performance vs V3
+   - Reduced encoder capacity (64 vs 128 channels)
+   - 3D conv instead of LSTM (wrong tool for temporal memory)
+   - Window size too small (3 timesteps insufficient)
 
 ---
 
@@ -306,6 +415,7 @@ A3C V3 with episode quality filtering now achieves 32.14% IoU, nearly 3x better 
 **Progress:**
 - Supervised (U-Net): 19.85% F1
 - A3C V3 (417K params, 4 workers, min-len 4): **40.91% IoU** ← Current best
+- A3C V7 (3D Conv temporal): 8.13% IoU ← FAILED
 
 **Key Insights:**
 1. Episode quality > quantity (502 episodes beats 5036)
@@ -313,6 +423,8 @@ A3C V3 with episode quality filtering now achieves 32.14% IoU, nearly 3x better 
 3. Model capacity not the bottleneck (935K params overfits)
 4. Per-cell 8-neighbor prediction matches fire physics
 5. Dense rewards essential for RL
+6. **Temporal modeling needs recurrent state (LSTM/GRU), not 3D convolutions**
+7. **Don't sacrifice encoder capacity for "efficiency" - performance first**
 
 **Path to 70% IoU:**
 - Current: 40.91%
@@ -326,4 +438,4 @@ A3C V3 with episode quality filtering now achieves 32.14% IoU, nearly 3x better 
 
 **Repository:** `/home/chaseungjoon/code/WildfirePrediction`
 
-**Last Updated:** 2025-11-13 01:54
+**Last Updated:** 2025-11-16 (V7 Postmortem)

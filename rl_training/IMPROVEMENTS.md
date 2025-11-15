@@ -123,32 +123,63 @@ class SpatialAttention(nn.Module):
 **Current:** `obs_t` → policy
 **Proposed:** `[obs_{t-2}, obs_{t-1}, obs_t]` → LSTM → policy
 
-**Implementation:**
+**V7 Attempt (FAILED - 8.13% IoU, -80% vs V3):**
+```python
+# What V7 tried (WRONG):
+- Reduced encoder: 14 → 32 → 64 (cut 128-channel layer)
+- Used 3D Conv instead of LSTM ("lighter")
+- Window size: 3 timesteps
+- Result: Catastrophic failure
+```
+
+**Why V7 Failed:**
+1. **3D Conv ≠ LSTM**: 3D convolutions capture local spatial-temporal patterns, but lack memory/state
+2. **Fire spread needs STATE**: Velocity and acceleration require hidden state (LSTM/GRU)
+3. **Reduced encoder capacity**: Cut from 128 to 64 channels, lost representation power
+4. **Window too small**: 3 timesteps insufficient for meaningful temporal patterns
+
+**Correct Implementation (V7.5 Plan):**
 ```python
 class TemporalEncoder(nn.Module):
-    def __init__(self, feature_dim=128):
+    def __init__(self, feature_dim=128):  # Keep 128 channels!
         super().__init__()
+        # 1. Use FULL V3 encoder (32→64→128), don't reduce capacity
+        self.cnn_encoder = V3Encoder()
+
+        # 2. Use LSTM (not 3D conv) for temporal state
         self.lstm = nn.LSTM(
-            input_size=feature_dim,
-            hidden_size=feature_dim,
+            input_size=128,  # Match V3 encoder output
+            hidden_size=128,
             num_layers=2,
-            batch_first=True
+            batch_first=True,
+            dropout=0.1
         )
 
+        # 3. Add layer norm for stability
+        self.layer_norm = nn.LayerNorm(128)
+
     def forward(self, feature_sequence):
-        # feature_sequence: (B, T, C, H, W)
-        # Process temporal dimension
+        # feature_sequence: (B, T, C, H, W) where T=5 (not 3!)
+        # Process temporal dimension with LSTM
         return temporal_features
 ```
+
+**Critical Changes from V7:**
+1. ✅ Keep FULL V3 encoder (128 channels)
+2. ✅ Use LSTM (not 3D conv) - proper temporal state
+3. ✅ Increase window to 5 timesteps (not 3)
+4. ✅ Add layer norm for training stability
+5. ✅ ~480K params total (~350K encoder + ~130K LSTM)
 
 **Benefits:**
 - Capture fire spread velocity
 - Model temporal trends (accelerating/decelerating spread)
 - Better wind pattern understanding
+- Maintain spatial feature quality from V3
 
-**Expected Gain:** +7-10% IoU
+**Expected Gain:** +7-10% IoU (if done correctly)
 **Difficulty:** Medium
-**Status:** Planned for V7
+**Status:** V7 failed, needs V7.5 with correct LSTM implementation
 
 ---
 
@@ -622,19 +653,21 @@ Baseline: V3 without augmentation
 
 ### ✅ Completed
 - V1-V2: Initial formulation (failed)
-- V3: Per-cell 8-neighbor formulation (40.91% IoU)
-- V4: Worker count optimization (4 workers optimal)
-- V5: 4-neighbor multi-task (failed - 12% F1)
-- Episode quality filtering (min-len 2→3→4)
+- V3: Per-cell 8-neighbor formulation (40.91% IoU) ✅
+- V4: Worker count optimization (4 workers optimal) ✅
+- V5: 4-neighbor multi-task (failed - 12% F1) ❌
+- V6: Data augmentation + replay (36.36% IoU) ✅
+- Episode quality filtering (min-len 2→3→4) ✅
 
-### 🚧 In Progress (V6)
-- Data augmentation (rotations, flips)
-- Experience replay buffer
-- Improved training stability
+### ❌ Failed Attempts
+- V7 (3D Conv temporal): 8.13% IoU, -80% degradation
+  - Mistake: Used 3D conv instead of LSTM
+  - Mistake: Reduced encoder capacity (64 vs 128 channels)
+  - Lesson: Temporal modeling needs recurrent state
 
-### 📋 Next Up (V7)
+### 📋 Next Up (V7.5 or V8)
+- Temporal context with LSTM (not 3D conv!)
 - Spatial attention mechanism
-- Temporal context (LSTM)
 - Channel attention
 
 ### 🔮 Future (V8+)
@@ -647,13 +680,15 @@ Baseline: V3 without augmentation
 
 ## Expected Performance Trajectory
 
-| Phase | Models | Key Features | Target IoU | Timeline |
-|-------|--------|--------------|------------|----------|
-| ✅ Completed | V3 | 8-neighbor, episode filtering | 40.91% | Done |
-| Phase 1 | V6 | V3 + augmentation + replay | 45-50% | 1-3 days |
-| Phase 2 | V7 | V6 + attention + temporal | 52-58% | 1-2 weeks |
-| Phase 3 | V7+ | V7 + curriculum + ensemble | 60-65% | 2-3 weeks |
-| Phase 4 | V8+ | Advanced architectures | 65-70% | 3-4 weeks |
+| Phase | Models | Key Features | Target IoU | Result |
+|-------|--------|--------------|------------|--------|
+| ✅ Completed | V3 | 8-neighbor, episode filtering | 40.91% | ✅ Done |
+| ❌ Failed | V5 | 4-neighbor multi-task | 50-60% | ❌ 12% F1 |
+| ✅ Phase 1 | V6 | V3 + augmentation + replay | 45-50% | ✅ 36.36% (modest gain) |
+| ❌ Failed | V7 | 3D Conv temporal (wrong!) | 47-50% | ❌ 8.13% (-80%!) |
+| Phase 2 | V7.5/V8 | LSTM temporal (correct) | 50-55% | Planned |
+| Phase 3 | V8+ | Attention + curriculum + ensemble | 60-65% | Future |
+| Phase 4 | V9+ | Advanced architectures | 65-70% | Future |
 
 ---
 
@@ -688,11 +723,13 @@ Baseline: V3 without augmentation
 
 1. **Episode Quality > Quantity:** 502 good episodes beats 5036 mixed episodes
 2. **Temporal Context is Critical:** Fire spread is inherently sequential
-3. **Attention Helps:** Fire front is sparse, attention can focus computation
-4. **Augmentation is Free Performance:** Rotation/flip invariance is guaranteed
-5. **Ensemble When Unsure:** 5 models always beats 1 model
-6. **Validate Frequently:** Don't overtrain on training set
-7. **Understand Failures:** Analyze where model fails, design targeted fixes
+3. **⚠️ Use Correct Architecture:** LSTM/GRU for temporal (NOT 3D conv) - V7 proved this
+4. **Don't Sacrifice Capacity:** Keep full encoder (128 channels), performance > efficiency
+5. **Attention Helps:** Fire front is sparse, attention can focus computation
+6. **Augmentation is Free Performance:** Rotation/flip invariance is guaranteed
+7. **Ensemble When Unsure:** 5 models always beats 1 model
+8. **Validate Frequently:** Don't overtrain on training set
+9. **Understand Failures:** Analyze where model fails, design targeted fixes (V7 taught us this)
 
 ---
 
@@ -705,6 +742,6 @@ Baseline: V3 without augmentation
 
 ---
 
-**Last Updated:** 2025-11-15
-**Current Focus:** Phase 1 - V6 Implementation
+**Last Updated:** 2025-11-16 (V7 Postmortem)
+**Current Focus:** Learning from V7 failure, planning V7.5 with correct LSTM
 **Target:** 70% IoU for production deployment
