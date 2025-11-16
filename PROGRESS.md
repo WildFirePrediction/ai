@@ -33,6 +33,7 @@
 > **V6** --min-episode-length **4**, --num-workers **4** : **0.3636** (@episode 761)
 
 > **V7** --min-episode-length **4**, --num-workers **4** : **0.0813** (@episode 560)
+> **V7.5** --min-episode-length **4**, --num-workers **4** : **0.09262** (@episode 982)
 
 ---
 
