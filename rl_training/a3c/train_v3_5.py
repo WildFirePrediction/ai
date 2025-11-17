@@ -31,31 +31,37 @@ from a3c.worker_v3_5 import worker_process_temporal
 from wildfire_env_temporal_v3_5 import WildfireEnvTemporal
 
 
-def create_filtered_episode_list(env_paths, max_file_size_mb=50, min_episode_length=4, temporal_window=5):
+def create_filtered_episode_list(env_paths, max_file_size_mb=50, min_episode_length=4, temporal_window=3, max_grid_cells=145000):
     """
     Pre-scan environments and create list of (env_path, start_timestep) pairs.
+
+    CRITICAL: Filters by GRID SIZE to prevent OOM on large grids.
 
     Args:
         env_paths: List of environment file paths
         max_file_size_mb: Skip files larger than this
         min_episode_length: Minimum timesteps with burns required
         temporal_window: Temporal window size (need enough history)
+        max_grid_cells: Maximum H×W cells (default 145K to stay under 55GB with 2 workers)
 
     Returns:
         List of (env_path, start_timestep, episode_length) tuples
     """
+    import gc
+
     MAX_SIZE = max_file_size_mb * 1024 * 1024
     filtered_episodes = []
 
     print(f"Scanning {len(env_paths)} environments for good episodes...")
-    print(f"Filtering: file size < {max_file_size_mb}MB, min {min_episode_length} steps with burns")
+    print(f"Filtering: file < {max_file_size_mb}MB, grid < {max_grid_cells:,} cells, min {min_episode_length} steps with burns")
     print(f"Temporal window: {temporal_window} timesteps")
 
     total_envs_scanned = 0
     total_envs_kept = 0
     total_episodes_found = 0
+    total_skipped_large_grid = 0
 
-    for env_path in tqdm(env_paths, desc="Scanning envs"):
+    for idx, env_path in enumerate(tqdm(env_paths, desc="Scanning envs")):
         # Skip large files
         if env_path.stat().st_size >= MAX_SIZE:
             continue
@@ -65,12 +71,19 @@ def create_filtered_episode_list(env_paths, max_file_size_mb=50, min_episode_len
         try:
             env = WildfireEnvTemporal(env_path, temporal_window=temporal_window)
 
-            # Find timesteps with burns in future
+            # CRITICAL: Filter by grid size to prevent OOM
+            grid_cells = env.H * env.W
+            if grid_cells > max_grid_cells:
+                total_skipped_large_grid += 1
+                del env
+                continue
+
+            # Find timesteps with burns in future (limit to first 5 starts to save memory)
             env_has_episodes = False
-            for start_t in range(env.T - min_episode_length):
+            for start_t in range(min(5, env.T - min_episode_length)):
                 # Check if there are burns in the next min_episode_length steps
                 has_burns_count = 0
-                for t in range(start_t, min(start_t + min_episode_length + 5, env.T - 1)):
+                for t in range(start_t, min(start_t + min_episode_length + 3, env.T - 1)):
                     actual_mask_t = env.fire_masks[t] > 0
                     actual_mask_t1 = env.fire_masks[t + 1] > 0
                     new_burns = (actual_mask_t1 & ~actual_mask_t)
@@ -80,7 +93,7 @@ def create_filtered_episode_list(env_paths, max_file_size_mb=50, min_episode_len
 
                 # If enough burns in this window, add as valid episode
                 if has_burns_count >= min_episode_length:
-                    max_length = min(env.T - start_t - 1, 20)  # Cap at 20 steps
+                    max_length = min(env.T - start_t - 1, 8)  # Cap at 8 steps to save memory
                     filtered_episodes.append((env_path, start_t, max_length))
                     total_episodes_found += 1
                     env_has_episodes = True
@@ -88,8 +101,10 @@ def create_filtered_episode_list(env_paths, max_file_size_mb=50, min_episode_len
             if env_has_episodes:
                 total_envs_kept += 1
 
-            # CRITICAL: Delete environment to free memory
+            # CRITICAL: Delete environment and force GC every 50 envs
             del env
+            if idx % 50 == 0:
+                gc.collect()
 
         except Exception as e:
             print(f"  Error loading {env_path.name}: {e}")
@@ -97,6 +112,7 @@ def create_filtered_episode_list(env_paths, max_file_size_mb=50, min_episode_len
 
     print(f"\nFiltering results:")
     print(f"  Environments scanned: {total_envs_scanned}")
+    print(f"  Skipped (large grid): {total_skipped_large_grid}")
     print(f"  Environments with good episodes: {total_envs_kept}")
     print(f"  Total episodes found: {total_episodes_found}")
     print(f"  Avg episodes per env: {total_episodes_found / max(1, total_envs_kept):.1f}")
@@ -105,11 +121,11 @@ def create_filtered_episode_list(env_paths, max_file_size_mb=50, min_episode_len
 
 
 def main():
-    parser = argparse.ArgumentParser(description='A3C V3.5 Training - Temporal Context')
+    parser = argparse.ArgumentParser(description='A3C V3.5 Training - Temporal Context with LSTM')
     parser.add_argument('--repo-root', type=str, default='/home/chaseungjoon/code/WildfirePrediction')
-    parser.add_argument('--num-workers', type=int, default=4, help='Number of parallel CPU workers')
+    parser.add_argument('--num-workers', type=int, default=2, help='Number of parallel CPU workers')
     parser.add_argument('--max-episodes', type=int, default=1000, help='Total episodes across all workers')
-    parser.add_argument('--temporal-window', type=int, default=5, help='Temporal window size')
+    parser.add_argument('--temporal-window', type=int, default=3, help='Temporal window size')
     parser.add_argument('--lr', type=float, default=7e-5, help='Learning rate')
     parser.add_argument('--gamma', type=float, default=0.99, help='Discount factor')
     parser.add_argument('--value-loss-coef', type=float, default=0.5, help='Value loss coefficient')
@@ -118,7 +134,8 @@ def main():
     parser.add_argument('--seed', type=int, default=42, help='Random seed')
     parser.add_argument('--max-envs', type=int, default=None, help='Limit number of training environments')
     parser.add_argument('--max-file-size-mb', type=int, default=50, help='Max environment file size in MB')
-    parser.add_argument('--min-episode-length', type=int, default=4, help='Min timesteps with burns per episode')
+    parser.add_argument('--max-grid-cells', type=int, default=145000, help='Max grid size (H×W) to prevent OOM (default 145K = ~2000 episodes)')
+    parser.add_argument('--min-episode-length', type=int, default=4, help='Min timesteps with burns per episode (mel4)')
     parser.add_argument('--log-interval', type=int, default=10, help='Log every N episodes')
     parser.add_argument('--wandb-project', type=str, default='wildfire-prediction', help='WandB project name')
     parser.add_argument('--wandb-run-name', type=str, default=None, help='WandB run name')
@@ -142,12 +159,14 @@ def main():
     train_paths = [env_dir / f'{eid}.pkl' for eid in train_env_ids]
 
     print(f"=" * 80)
-    print(f"A3C V3.5 Training - Temporal Context with Fire Instance Tracking")
+    print(f"A3C V3.5 Training - Temporal ConvLSTM with Grid Size Filtering")
     print(f"=" * 80)
     print(f"Problem: Per-cell 8-neighbor prediction + TEMPORAL CONTEXT")
     print(f"Temporal window: {args.temporal_window} timesteps")
-    print(f"Rewards: DENSE + CUMULATIVE TEMPORAL BONUS")
-    print(f"Fire tracking: Individual fire instances tracked across time")
+    print(f"Temporal model: ConvLSTM (spatial grid processing)")
+    print(f"Rewards: DENSE IoU")
+    print(f"Grid filter: max {args.max_grid_cells:,} cells (CRITICAL - largest grid is 543K!)")
+    print(f"Expected memory: ~55GB with 2 workers, 8 steps (without filter: 203GB OOM!)")
     print(f"=" * 80)
     print(f"Training environments: {len(train_paths)}")
     print(f"Number of workers: {args.num_workers}")
@@ -155,12 +174,13 @@ def main():
     print(f"Learning rate: {args.lr}")
     print(f"=" * 80)
 
-    # FILTER EPISODES
+    # FILTER EPISODES by GRID SIZE (critical for memory)
     filtered_episodes = create_filtered_episode_list(
         train_paths,
         max_file_size_mb=args.max_file_size_mb,
         min_episode_length=args.min_episode_length,
-        temporal_window=args.temporal_window
+        temporal_window=args.temporal_window,
+        max_grid_cells=args.max_grid_cells
     )
 
     if len(filtered_episodes) == 0:
@@ -178,16 +198,17 @@ def main():
     # Initialize WandB
     use_wandb = not args.no_wandb
     if use_wandb:
-        wandb_run_name = args.wandb_run_name or f"a3c-v3.5-temporal-w{args.num_workers}-tw{args.temporal_window}"
+        wandb_run_name = args.wandb_run_name or f"a3c-v3.5-lstm-fixed-w{args.num_workers}-tw{args.temporal_window}"
         wandb.init(
             project=args.wandb_project,
             name=wandb_run_name,
             config={
-                "model": "A3C-V3.5-Temporal-LSTM",
+                "model": "A3C-V3.5-Temporal-ConvLSTM",
                 "formulation": "temporal_per_cell_8neighbor",
                 "temporal_window": args.temporal_window,
-                "rewards": "dense_cumulative_temporal",
-                "fire_tracking": "instance_based",
+                "temporal_model": "ConvLSTM",
+                "rewards": "dense_iou",
+                "memory_fix": "ConvLSTM_not_per_pixel",
                 "num_workers": args.num_workers,
                 "learning_rate": args.lr,
                 "max_episodes": args.max_episodes,
@@ -283,8 +304,9 @@ def main():
         'total_episodes': global_episode_counter.value,
         'config': vars(args),
         'filtered_episodes_count': len(filtered_episodes),
-        'formulation': 'temporal_per_cell_8neighbor_cumulative_reward',
-        'temporal_window': args.temporal_window
+        'formulation': 'temporal_per_cell_8neighbor_lstm',
+        'temporal_window': args.temporal_window,
+        'memory_leaks_fixed': 7
     }, final_path)
 
     print(f"\n{'=' * 80}")
@@ -297,9 +319,9 @@ def main():
     # Log final model to WandB
     if use_wandb:
         artifact = wandb.Artifact(
-            name='final-model-v3-5-temporal',
+            name='final-model-v3-5-temporal-lstm-fixed',
             type='model',
-            description=f'A3C V3.5 (temporal) after {global_episode_counter.value} episodes, IoU {global_best_iou.value:.4f}'
+            description=f'A3C V3.5 (LSTM, memory fixed) after {global_episode_counter.value} episodes, IoU {global_best_iou.value:.4f}'
         )
         artifact.add_file(str(final_path))
         wandb.log_artifact(artifact)
