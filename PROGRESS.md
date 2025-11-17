@@ -20,11 +20,12 @@
 > **V3** --min-episode-length **4**, --num-workers **8** : **0.4000** (@episode 1918)
 > 
 > **V3** --min-episode-length **5**, --num-workers **8** : **0.1165** (@episode 428)
-
-
+>
 > **V3** --min-episode-length **4**, --num-workers **4** : **0.4091** (@episode 731)
 >
 > **V3** --min-episode-length **4**, --num-workers **2** : **0.0569** (@episode 76)
+>
+> **V3.5** --mel **4**, --num-workers **4** - CRASHED (Memory overflow)
 
 > **V5** --min-episode-length **4**, --num-workers **4** : **0.1000** (@episode 831)
 >
@@ -33,6 +34,7 @@
 > **V6** --min-episode-length **4**, --num-workers **4** : **0.3636** (@episode 761)
 
 > **V7** --min-episode-length **4**, --num-workers **4** : **0.0813** (@episode 560)
+> 
 > **V7.5** --min-episode-length **4**, --num-workers **4** : **0.09262** (@episode 982)
 
 ---
