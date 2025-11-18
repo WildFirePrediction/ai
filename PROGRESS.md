@@ -1,12 +1,5 @@
 # Wildfire Prediction Training Progress
 
-**Status**
-- A3C training in progress
-- Root Cause of Initial Failures : 31,077:1 class imbalance, incorrect problem formulation, low-quality training episodes
-
-
----
-
 ## Best Scores Summary
 
 ### Supervised Learning (F1 Score)
