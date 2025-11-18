@@ -39,11 +39,11 @@
 
 ---
 
-## RL
+# RL
 
 ---
 
-### A3C V1-V2 : CRITICAL ERROR
+## A3C V1-V2 : CRITICAL ERROR
 
 **Problem Formulation (WRONG):**
 ```
@@ -52,26 +52,19 @@ Action: (H, W) binary mask - predict ALL 30,000 cells independently
 Reward: Sparse - only at episode end
 ```
 
-**Why This Failed**
+**Wrong Formulation**
 
-1. **Massive Action Space:** 30,000-dimensional Bernoulli distribution
-2. **Log Probability Explosion:**
-   - Log prob = sum over 30,000 cells
-   - Actual results: log_prob reached -200,000
-   - Loss exploded to -861,886
-3. **Sparse Rewards:** Only receiving signal at episode end
-4. **No Structure:** Independent predictions per cell don't model cell-to-cell fire spread
-5. **Credit Assignment Impossible:** Which of 30,000 decisions caused the reward?
+1. **Perdict all 30,000 cells independently
+2. **Only receive reward at episode end** -> Credit assignment impossible
 
-**Results of Wrong Formulation:**
-- Episode reward: -4 to -9 (consistently negative)
-- IoU: 0.0001% (essentially zero)
-- Loss: -180,000 to -860,000 (unstable)
-- Learning: None
+**Result**
+- Avg reward: -4 ~ -9
+- IoU: 0.0001% 
+- Loss: -180,000 ~ -860,000 (unstable)
 
 ---
 
-### A3C V7: Temporal Context with 3D Convolutions - FAILED
+## A3C V7: Temporal Context with 3D Convolutions - FAILED
 
 **Goal:** Add temporal context to V3 (40.91% IoU) → Target 47-50% IoU
 
@@ -173,11 +166,11 @@ Window size: 3 timesteps
 
 ---
 
-### A3C V3: Correct Formulation
+## A3C V3: Correct Formulation
 
-**Critical Insight :** Predict 8-neighbor spread for each currently burning cell
+**Insight :** Predict 8-neighbor spread for each currently burning cell
 
-**Problem Formulation (CORRECT)**
+> **Problem Formulation**
 ```
 State: (14, H, W) environmental features + current fire mask
 Action: For each burning cell at (i,j), predict 8-neighbor spread
@@ -187,7 +180,7 @@ Action: For each burning cell at (i,j), predict 8-neighbor spread
 Reward: DENSE - IoU computed at EVERY timestep
 ```
 
-**Architecture Changes**
+> **Architecture Changes**
 
 1. **Shared CNN Encoder**
    - Input: (B, 14, H, W)
@@ -204,49 +197,15 @@ Reward: DENSE - IoU computed at EVERY timestep
    - FC layers: 128 → 64 → 1
    - Output: Scalar state value
 
-**Dense Rewards:**
-```python
-def step(self, predicted_burn_mask):
-    # Compute IoU at THIS timestep
-    actual_mask_t = self.fire_masks[self.t] > 0
-    actual_mask_t1 = self.fire_masks[self.t + 1] > 0
-    new_burns = actual_mask_t1 & ~actual_mask_t
+> Status and Results
 
-    intersection = (predicted_burn_mask & new_burns).sum()
-    union = (predicted_burn_mask | new_burns).sum()
-
-    reward = intersection / (union + 1e-8)  # IoU as reward
-
-    self.t += 1
-    return next_obs, reward, done, info
-```
-
-**Filtered Episodes:**
-
-Pre-scan environments to find episodes with actual fire spread:
-```python
-# Filter criteria:
-- File size < 50MB
-- Minimum 2 timesteps with burns
-- Maximum episode length: 20 steps
-
-# Results:
-- Scanned: 2066 environments
-- Kept: 1201 environments with good episodes
-- Total episodes: 5036
-```
-
----
-
-## Status and Results
-
-### Training Configuration
+## Training Configuration
 
 **A3C V3 Settings:**
 ```
 Model: A3C_PerCellModel (416,873 parameters)
-Workers: 8 parallel CPU workers
-Episodes: 1000 (currently in progress)
+Workers: 8(or 4) parallel CPU workers
+Episodes: 1000 ~ 3000 
 Learning Rate: 1e-4
 Gamma (discount): 0.99
 Value Loss Coef: 0.5
@@ -254,23 +213,20 @@ Entropy Coef: 0.01
 Max Grad Norm: 0.5
 ```
 
-### Performance Metrics
+## Performance Metrics
 
-**Training Progress (Episode 180):**
+| Approach                          | Best Performance        | Training Time | Issues                                     |
+|-----------------------------------|-------------------------|---------------|--------------------------------------------|
+| U-Net V2 (pos=150)                | F1: 19.85%, IoU ~11-12% | 3 epochs, ~1 hour | Early peaking, overfitting                 |
+| U-Net V3 (Combined)               | F1: 15.95%              | 5 epochs, ~1.5 hours | Over-prediction                            |
+| U-Net V3 (Dice)                   | F1: 6.68%               | 3 epochs, ~1 hour | Severe over-prediction                     |
+| A3C V3 (min-len 2)                | IoU: 9.4%               | 1000 episodes, ~1 hour | Unstable, catastrophic forgetting          |
+| A3C V3 (min-len 3)                | IoU: 17.86%             | 1000 episodes, ~1 hour | Stable, some forgetting after peak         |
+| **A3C V3 (min-len 4, 8 workers)**            | **IoU: 32.14%**         | **1000 episodes, ~1 hour** | **Very stable, no forgetting**             |
+| **A3C V3 (min-len 4, 4 workers)** | **IoU: 40.91%**         | **1000 episodes, ~1 hour** | **Fixes overfitting issue with 8 workers** |
+| A3C V7 (3D Conv, 4 workers)       | IoU: 8.13%              | 560 episodes, ~1 hour | **FAILED: -80% vs V3, wrong architecture** |
 
-| Metric | Value | Comparison |
-|--------|-------|------------|
-| Best IoU | 14.21% | vs U-Net best 11-12% (F1 20%) |
-| Average IoU | ~1-2% | Expected variance in RL |
-| Loss Range | -7 to +3 | Stable (vs -200,000 before) |
-| Action Space | ~80 decisions | vs 30,000 before |
-
-**Learning Trajectory:**
-- Episodes 1-60: 0% IoU (exploration phase)
-- Episode 80: 0.95% IoU (first learning signal)
-- Episode 100: 0.79% IoU
-- Episode 120: 1.78% IoU
-- Episode 180: 14.21% IoU (breakthrough)
+A3C V3 with episode quality filtering achieves 40.91% IoU, nearly 4x better than supervised learning's best (11-12% IoU equivalent). V7's failure demonstrates that temporal modeling requires proper recurrent architecture (LSTM/GRU), not 3D convolutions.
 
 **Key Observations:**
 
@@ -280,24 +236,43 @@ Max Grad Norm: 0.5
 4. **Parallel Execution:** All 8 workers contributing (confirmed by rapid episode completion)
 5. **Dense Reward Signal:** Receiving feedback at every timestep, not just episode end
 
-### Comparison to Supervised Learning
+---
 
-| Approach                          | Best Performance        | Training Time | Issues                                     |
-|-----------------------------------|-------------------------|---------------|--------------------------------------------|
-| U-Net V2 (pos=150)                | F1: 19.85%, IoU ~11-12% | 3 epochs, ~1 hour | Early peaking, overfitting                 |
-| U-Net V3 (Combined)               | F1: 15.95%              | 5 epochs, ~1.5 hours | Over-prediction                            |
-| U-Net V3 (Dice)                   | F1: 6.68%               | 3 epochs, ~1 hour | Severe over-prediction                     |
-| A3C V3 (min-len 2)                | IoU: 9.4%               | 1000 episodes, ~1 hour | Unstable, catastrophic forgetting          |
-| A3C V3 (min-len 3)                | IoU: 17.86%             | 1000 episodes, ~1 hour | Stable, some forgetting after peak         |
-| **A3C V3 (min-len 4)**            | **IoU: 32.14%**         | **1000 episodes, ~1 hour** | **Very stable, no forgetting**             |
-| **A3C V3 (min-len 4, 4 workers)** | **IoU: 40.91%**         | **1000 episodes, ~1 hour** | **Fixes overfitting issue with 8 workers** |
-| A3C V7 (3D Conv, 4 workers)       | IoU: 8.13%              | 560 episodes, ~1 hour | **FAILED: -80% vs V3, wrong architecture** |
+## A3C V4 : V3 with increased parameters (4M)(CRASHED)
 
-A3C V3 with episode quality filtering achieves 40.91% IoU, nearly 4x better than supervised learning's best (11-12% IoU equivalent). V7's failure demonstrates that temporal modeling requires proper recurrent architecture (LSTM/GRU), not 3D convolutions.
+## A3C V3-medium : V3 with medium parameter count (917k)
+
+### Result
+
+-  **IoU :** : 0.7
+
+## A3C V5 : 4 neighbor instead of 8
+
+### Result
+
+- **IoU :** : 0.12
+
+## A3C V6 : Data augmentation 
+
+### Result
+
+- **IoU :** : 0.36
+
+## A3C V7 : 3D Conv architecture
+
+### Result 
+
+- **IoU :** : 0.09
+
+## A3C V3.5 : LSTM 
+
+### Result
+
+- **IoU :** : -
 
 ---
 
-## Supervised Learning (U-Net)
+# Supervised Learning (U-Net)
 
 **Problem:** Extreme class imbalance (31,077:1)
 - 79.1% samples have zero burns
@@ -434,8 +409,6 @@ A3C V3 with episode quality filtering achieves 40.91% IoU, nearly 4x better than
 - Next: V5 (4-neighbor multi-task) targeting 50-60%
 - Architecture improvements: +5-10%
 - Total: 55-70% achievable
-
-**Files:** See `rl_training/a3c/TODO.md` for next steps and commands.
 
 ---
 

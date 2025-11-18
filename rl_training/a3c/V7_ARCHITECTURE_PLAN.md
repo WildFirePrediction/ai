@@ -1,4 +1,4 @@
-# A3C V7 - Temporal LSTM Architecture
+# A3C V3.5 - Temporal LSTM Architecture
 
 ## Goal
 Add temporal context to V3 baseline (40.91% IoU) → Target 47-50% IoU
@@ -208,9 +208,9 @@ value_loss_coef = 0.5
 max_grad_norm = 0.5
 ```
 
-### New for V7
+### New for V3.5
 ```python
-temporal_window_size = 3  # Look back 3 timesteps
+temporal_window_size = 5
 lstm_hidden_dim = 128  # Match CNN output
 lstm_num_layers = 2
 lstm_dropout = 0.1
@@ -237,33 +237,6 @@ eval_every = 100
 1. **Overfitting to noise**: Use dropout in LSTM
 2. **Vanishing gradients**: 2-layer LSTM should be okay for window=3
 3. **Memory explosion**: 3x memory usage, monitor carefully
-
----
-
-## Implementation Steps
-
-### Step 1: Modify Environment (1 day)
-- Add `_get_obs_sequence()` method
-- Update `reset()` and `step()` to return sequences
-- Test with dummy forward passes
-
-### Step 2: Build Model (1 day)
-- Implement `TemporalLSTM` module
-- Integrate with V3's CNN encoder and heads
-- Test forward/backward pass shapes
-
-### Step 3: Update Worker (0.5 day)
-- Handle obs_seq instead of obs
-- Update tensor shapes throughout
-
-### Step 4: Training (2-3 days)
-- Train for 1000 episodes
-- Monitor for memory issues
-- Compare with V3 baseline
-
-### Step 5: Evaluation (0.5 day)
-- Run validation set evaluation
-- Target: 47-50% IoU (from V3's 40.91%)
 
 ---
 
@@ -357,234 +330,26 @@ If V7 doesn't reach 47% IoU:
 
 ---
 
-## Files to Create
+## Files to Revamp
 
-1. `rl_training/a3c/model_v7.py` - Temporal model architecture
-2. `rl_training/a3c/worker_v7.py` - Worker with temporal observations
-3. `rl_training/a3c/train_v7.py` - Training script
-4. `rl_training/wildfire_env_temporal_v2.py` - Environment with obs sequences
+1. `rl_training/a3c/model_v3_5.py` - Temporal model architecture
+2. `rl_training/a3c/worker_v3_5.py` - Worker with temporal observations
+3. `rl_training/a3c/train_v3_5.py` - Training script
+4. `rl_training/wildfire_env_temporal_v3_5.py` - Environment with obs sequences
 
 ---
 
-**Target Completion**: 7 days (Dec 22)
 **Expected Result**: 47-50% IoU → +6-9% improvement over V3
-**Risk Level**: Medium (temporal modeling is well-studied)
 
----
-
-## ⚠️ POSTMORTEM: V7 FAILED CATASTROPHICALLY
-
-**Date**: 2025-11-16
-**Result**: 8.13% IoU at episode 560
-**Comparison**: -80% degradation vs V3's 40.91% IoU
-
-### What Was Actually Implemented (vs Plan)
-
-| Aspect | Original Plan | What Was Built | Impact |
-|--------|---------------|----------------|--------|
-| Temporal Model | 2-layer LSTM (128 hidden) | 3D Convolution | ❌ CRITICAL |
-| CNN Encoder | Keep V3 (32→64→128) | Reduced (32→64) | ❌ CRITICAL |
-| Window Size | 3 timesteps | 3 timesteps | ⚠️ Too small |
-| Params | ~480K | ~450K | Lighter but worse |
-| Training | 1000 episodes, 4 workers | 5000 episodes, 4 workers | Same |
-
-### Critical Mistakes
-
-#### Mistake #1: Used 3D Conv Instead of LSTM
-**Decision**: "3D Conv is MUCH lighter than LSTM!"
-**Rationale**: Save memory and computation
-**Why It Failed**:
-- **3D convolutions**: Capture local spatial-temporal patterns in receptive field
-- **LSTMs**: Maintain hidden STATE to remember temporal dynamics
-- **Fire spread needs**: Velocity, acceleration, temporal trends → needs STATE
-- **Result**: Model couldn't learn fire spread velocity or acceleration
-
-**Code Evidence** (model_v7.py:44-50):
-```python
-# Temporal 3D Conv (MUCH lighter than LSTM!)
-self.temporal_conv = nn.Sequential(
-    nn.Conv3d(64, 96, kernel_size=(3, 3, 3), padding=(0, 1, 1)),
-    nn.ReLU(),
-    nn.Conv3d(96, 128, kernel_size=(1, 3, 3), padding=(0, 1, 1)),
-    nn.ReLU(),
-)
-```
-
-#### Mistake #2: Reduced CNN Encoder Capacity
-**Decision**: Cut 128-channel layer, keep only 32→64
-**Rationale**: "3D conv will compensate for weaker encoder"
-**Why It Failed**:
-- V3's 128-channel layer was CRITICAL for representation power
-- Reducing to 64 channels lost spatial feature quality
-- 3D conv couldn't compensate for this loss
-- Trading spatial features for temporal modeling was wrong approach
-
-**Code Evidence** (model_v7.py:35-41):
-```python
-# CNN encoder (LIGHTER - 64 channels instead of 128)
-self.encoder = nn.Sequential(
-    nn.Conv2d(in_channels, 32, 3, padding=1),
-    nn.ReLU(),
-    nn.Conv2d(32, 64, 3, padding=1),  # Stopped here, no 128!
-    nn.ReLU(),
-)
-```
-
-#### Mistake #3: Window Size Too Small
-**Plan**: 3 timesteps
-**Problem**: Not enough temporal context to learn velocity/acceleration
-**Should Have Been**: 5-7 timesteps minimum
-
-### Performance Analysis
-
-| Metric | V3 Baseline | V7 Result | Change |
-|--------|-------------|-----------|--------|
-| Best IoU | 40.91% | 8.13% | **-80.1%** |
-| Episode | 731 | 560 | -23% |
-| Architecture | Simple, proven | Complex, wrong | - |
-| Params | 417K | ~450K | +8% |
-
-**Training Dynamics**:
-- Model struggled from the start
-- Never exceeded ~10% IoU
-- Worse than V5 (12% F1), V6 (36.36% IoU)
-- Even worse than min-len 2 filtering (9.4% IoU)
-- Comparable to catastrophically bad early V3 experiments
-
-### Root Cause Analysis
-
-**Fundamental Misunderstanding**: Optimized for "lighter" instead of "better"
-
-1. **3D Conv Philosophy Error**:
-   - 3D convs are great for: Action recognition, video classification (pattern matching)
-   - 3D convs are BAD for: Sequential prediction with velocity/acceleration (state needed)
-   - Fire spread is the latter: needs to remember how fast fire is moving
-
-2. **Architecture Trade-off Error**:
-   - Thought: "Reduce spatial quality, add temporal modeling"
-   - Reality: Need BOTH spatial quality AND temporal memory
-   - Should have: Keep V3 encoder + add LSTM
-
-3. **Memory Optimization Error**:
-   - Fear: LSTM would use too much memory
-   - Reality: ~130K params for 2-layer LSTM is negligible
-   - Wrong priority: Saved 30KB, lost 80% performance
-
-### Correct V7.5 Architecture
-
-**Philosophy**: Performance first, then optimize
-
-```python
-class A3C_TemporalModel_V7_5(nn.Module):
-    def __init__(self):
-        super().__init__()
-
-        # 1. KEEP FULL V3 ENCODER (128 channels)
-        self.encoder = nn.Sequential(
-            nn.Conv2d(14, 32, 3, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(32, 64, 3, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(64, 128, 3, padding=1),  # DON'T CUT THIS!
-            nn.ReLU(),
-        )
-
-        # 2. USE LSTM FOR TEMPORAL STATE
-        self.temporal_lstm = nn.LSTM(
-            input_size=128,
-            hidden_size=128,
-            num_layers=2,
-            batch_first=True,
-            dropout=0.1
-        )
-
-        # 3. ADD LAYER NORM FOR STABILITY
-        self.layer_norm = nn.LayerNorm(128)
-
-        # 4. Keep V3's policy and value heads
-        self.policy_head = V3_PolicyHead()
-        self.value_head = V3_ValueHead()
-
-    def forward(self, obs_seq):
-        # obs_seq: (B, T, 14, H, W) where T=5
-        B, T, C, H, W = obs_seq.shape
-
-        # Encode each timestep
-        features = []
-        for t in range(T):
-            feat_t = self.encoder(obs_seq[:, t])  # (B, 128, H, W)
-            features.append(feat_t)
-        features = torch.stack(features, dim=1)  # (B, T, 128, H, W)
-
-        # Process with LSTM at each spatial location
-        # Reshape: (B, H, W, T, 128)
-        x = features.permute(0, 3, 4, 1, 2)
-        x = x.reshape(B * H * W, T, 128)
-
-        # LSTM
-        lstm_out, _ = self.temporal_lstm(x)
-        temporal_features = lstm_out[:, -1, :]  # Last timestep
-
-        # Layer norm
-        temporal_features = self.layer_norm(temporal_features)
-
-        # Reshape back
-        temporal_features = temporal_features.reshape(B, H, W, 128)
-        temporal_features = temporal_features.permute(0, 3, 1, 2)
-
-        # Policy and value heads (same as V3)
-        return temporal_features
-```
-
-**Key Differences from V7**:
-1. ✅ Full V3 encoder (128 channels)
-2. ✅ LSTM instead of 3D conv
-3. ✅ Increase window to 5 timesteps
-4. ✅ Layer norm for stability
-5. ✅ ~480K params (worth it!)
-
-### Lessons Learned
-
-1. **Architectural Choice Matters More Than Efficiency**
-   - Wrong architecture = catastrophic failure
-   - Right architecture = worth the extra 30K params
-
-2. **Temporal Modeling Requires State**
-   - 3D conv: Pattern matching in temporal window
-   - LSTM/GRU: State memory for velocity/acceleration
-   - Fire spread needs the latter
-
-3. **Don't Sacrifice Proven Components**
-   - V3's 128-channel encoder was proven critical
-   - Reducing it was penny-wise, pound-foolish
-
-4. **Test Assumptions Early**
-   - Should have tested 3D conv on small dataset first
-   - Would have caught this after 50-100 episodes
-   - Instead wasted 5000 episodes (~1 hour compute)
-
-5. **Performance > Efficiency (at research stage)**
-   - Optimize for correctness first
-   - Optimize for efficiency later
-   - Can't optimize a broken architecture
-
-### Files & Code Location
-
-- **Model**: `rl_training/a3c/model_v7.py` (FAILED implementation)
-- **Training**: `rl_training/a3c/train_v7.py`
-- **Worker**: `rl_training/a3c/worker_v7.py`
-- **Checkpoint**: None saved (performance never exceeded 10% IoU)
-- **WandB Run**: `run-20251115_233004-h5rt3iop` (a3c-v7-workers4)
-
-### Next Steps
+--- 
 
 **DO NOT:**
-- ❌ Try to "fix" V7 by tuning hyperparameters
+- ❌ Try to "fix" V3.5 by tuning hyperparameters
 - ❌ Use 3D conv for any temporal modeling
 - ❌ Reduce encoder capacity for "efficiency"
 
 **DO:**
-- ✅ Implement V7.5 with correct LSTM architecture
+- ✅ Implement V3.5 with correct LSTM architecture
 - ✅ Keep full V3 encoder (128 channels)
 - ✅ Use 5 timestep window (not 3)
 - ✅ Add layer norm for training stability
@@ -592,5 +357,4 @@ class A3C_TemporalModel_V7_5(nn.Module):
 
 ---
 
-**Postmortem Written**: 2025-11-16
-**Next After V7 Failure**: V7.5 with correct LSTM architecture → Target 50-55% IoU
+**Last Edited**: 2025-11-18
