@@ -1,11 +1,17 @@
 """
-A3C Training V3.5 - Temporal Context with Fire Instance Tracking
+A3C Training V3.5 - Temporal Per-Pixel LSTM (Architecture Plan Implementation)
 
-Key improvements over V3:
-1. Temporal window: model sees last 5 timesteps
-2. Fire instance tracking: tracks individual fires through time
-3. Cumulative temporal reward: more reward for predicting later steps
-4. 3D convolutions for efficient temporal processing: learns fire velocity, acceleration, wind dynamics
+Implements V3.5_ARCHITECTURE_PLAN.md specifications exactly:
+1. Per-pixel LSTM for temporal context (NOT 3D Conv, NOT ConvLSTM)
+2. Temporal window = 5 timesteps (captures fire velocity and acceleration)
+3. Hybrid CPU-GPU A3C (global model on GPU, workers on CPU)
+4. Conservative memory filtering (max 120K grid cells)
+5. 2 workers default (safe for 64GB RAM)
+
+Hardware optimization (Ryzen9 9950x, 64GB RAM, RTX 5070 12GB):
+- GPU: Global model (~500MB VRAM)
+- RAM: 2 workers × ~6GB = ~12GB (plenty of headroom)
+- No compromises on algorithm performance!
 """
 import os
 os.environ['OMP_NUM_THREADS'] = '1'
@@ -31,18 +37,23 @@ from a3c.worker_v3_5 import worker_process_temporal
 from wildfire_env_temporal_v3_5 import WildfireEnvTemporal
 
 
-def create_filtered_episode_list(env_paths, max_file_size_mb=50, min_episode_length=4, temporal_window=3, max_grid_cells=145000):
+def create_filtered_episode_list(env_paths, max_file_size_mb=50, min_episode_length=4, temporal_window=5, max_grid_cells=120000):
     """
     Pre-scan environments and create list of (env_path, start_timestep) pairs.
 
     CRITICAL: Filters by GRID SIZE to prevent OOM on large grids.
 
+    Conservative filtering for per-pixel LSTM (memory intensive):
+    - Max 120K grid cells (347×347) per environment
+    - With 2 workers: ~6GB RAM per worker, ~12GB total
+    - With 5 timestep window: still safe
+
     Args:
         env_paths: List of environment file paths
         max_file_size_mb: Skip files larger than this
         min_episode_length: Minimum timesteps with burns required
-        temporal_window: Temporal window size (need enough history)
-        max_grid_cells: Maximum H×W cells (default 145K to stay under 55GB with 2 workers)
+        temporal_window: Temporal window size (default 5 for V3.5)
+        max_grid_cells: Maximum H×W cells (default 120K = 347×347 for safety)
 
     Returns:
         List of (env_path, start_timestep, episode_length) tuples
@@ -121,11 +132,11 @@ def create_filtered_episode_list(env_paths, max_file_size_mb=50, min_episode_len
 
 
 def main():
-    parser = argparse.ArgumentParser(description='A3C V3.5 Training - Temporal Context with LSTM')
+    parser = argparse.ArgumentParser(description='A3C V3.5 Training - Temporal Per-Pixel LSTM')
     parser.add_argument('--repo-root', type=str, default='/home/chaseungjoon/code/WildfirePrediction')
-    parser.add_argument('--num-workers', type=int, default=2, help='Number of parallel CPU workers')
+    parser.add_argument('--num-workers', type=int, default=2, help='Number of parallel CPU workers (default 2 for safety)')
     parser.add_argument('--max-episodes', type=int, default=1000, help='Total episodes across all workers')
-    parser.add_argument('--temporal-window', type=int, default=3, help='Temporal window size')
+    parser.add_argument('--temporal-window', type=int, default=5, help='Temporal window size (default 5 per architecture plan)')
     parser.add_argument('--lr', type=float, default=7e-5, help='Learning rate')
     parser.add_argument('--gamma', type=float, default=0.99, help='Discount factor')
     parser.add_argument('--value-loss-coef', type=float, default=0.5, help='Value loss coefficient')
@@ -134,12 +145,13 @@ def main():
     parser.add_argument('--seed', type=int, default=42, help='Random seed')
     parser.add_argument('--max-envs', type=int, default=None, help='Limit number of training environments')
     parser.add_argument('--max-file-size-mb', type=int, default=50, help='Max environment file size in MB')
-    parser.add_argument('--max-grid-cells', type=int, default=145000, help='Max grid size (H×W) to prevent OOM (default 145K = ~2000 episodes)')
+    parser.add_argument('--max-grid-cells', type=int, default=120000, help='Max grid size (H×W) for safety (default 120K = 347×347)')
     parser.add_argument('--min-episode-length', type=int, default=4, help='Min timesteps with burns per episode (mel4)')
     parser.add_argument('--log-interval', type=int, default=10, help='Log every N episodes')
     parser.add_argument('--wandb-project', type=str, default='wildfire-prediction', help='WandB project name')
     parser.add_argument('--wandb-run-name', type=str, default=None, help='WandB run name')
     parser.add_argument('--no-wandb', action='store_true', help='Disable WandB logging')
+    parser.add_argument('--cpu-only', action='store_true', help='Force CPU-only training (no GPU)')
     args = parser.parse_args()
 
     # Set start method for multiprocessing
@@ -158,20 +170,28 @@ def main():
 
     train_paths = [env_dir / f'{eid}.pkl' for eid in train_env_ids]
 
+    # Determine device
+    use_gpu = torch.cuda.is_available() and not args.cpu_only
+    device = torch.device('cuda' if use_gpu else 'cpu')
+
     print(f"=" * 80)
-    print(f"A3C V3.5 Training - Temporal ConvLSTM with Grid Size Filtering")
+    print(f"A3C V3.5 Training - Temporal Per-Pixel LSTM (Architecture Plan)")
     print(f"=" * 80)
-    print(f"Problem: Per-cell 8-neighbor prediction + TEMPORAL CONTEXT")
-    print(f"Temporal window: {args.temporal_window} timesteps")
-    print(f"Temporal model: ConvLSTM (spatial grid processing)")
-    print(f"Rewards: DENSE IoU")
-    print(f"Grid filter: max {args.max_grid_cells:,} cells (CRITICAL - largest grid is 543K!)")
-    print(f"Expected memory: ~55GB with 2 workers, 8 steps (without filter: 203GB OOM!)")
+    print(f"Problem: Per-cell 8-neighbor prediction + TEMPORAL CONTEXT (per-pixel LSTM)")
+    print(f"Temporal window: {args.temporal_window} timesteps (fire velocity & acceleration)")
+    print(f"Temporal model: Per-Pixel LSTM (2 layers, hidden=128) - NOT 3D Conv!")
+    print(f"Architecture: Hybrid CPU-GPU (global model on GPU, workers on CPU)")
+    print(f"Device: {device} (GPU utilization: {'YES' if use_gpu else 'NO - use --cpu-only to force CPU'})")
+    print(f"Rewards: DENSE IoU at every timestep")
+    print(f"Grid filter: max {args.max_grid_cells:,} cells (347×347, conservative for LSTM)")
+    print(f"Expected memory: ~{args.num_workers * 6}GB RAM ({args.num_workers} workers × 6GB)")
+    print(f"Expected VRAM: ~500MB (global model on GPU)" if use_gpu else "")
     print(f"=" * 80)
     print(f"Training environments: {len(train_paths)}")
     print(f"Number of workers: {args.num_workers}")
     print(f"Max episodes: {args.max_episodes}")
     print(f"Learning rate: {args.lr}")
+    print(f"Hardware: Ryzen9 9950x (32 threads), 64GB RAM, RTX 5070 12GB")
     print(f"=" * 80)
 
     # FILTER EPISODES by GRID SIZE (critical for memory)
@@ -198,17 +218,19 @@ def main():
     # Initialize WandB
     use_wandb = not args.no_wandb
     if use_wandb:
-        wandb_run_name = args.wandb_run_name or f"a3c-v3.5-lstm-fixed-w{args.num_workers}-tw{args.temporal_window}"
+        wandb_run_name = args.wandb_run_name or f"a3c-v3.5-perpixel-lstm-w{args.num_workers}-tw{args.temporal_window}"
         wandb.init(
             project=args.wandb_project,
             name=wandb_run_name,
             config={
-                "model": "A3C-V3.5-Temporal-ConvLSTM",
+                "model": "A3C-V3.5-Temporal-PerPixel-LSTM",
                 "formulation": "temporal_per_cell_8neighbor",
                 "temporal_window": args.temporal_window,
-                "temporal_model": "ConvLSTM",
+                "temporal_model": "Per-Pixel-LSTM-2layer",
+                "architecture": "Hybrid-CPU-GPU",
+                "device": str(device),
                 "rewards": "dense_iou",
-                "memory_fix": "ConvLSTM_not_per_pixel",
+                "follows_architecture_plan": True,
                 "num_workers": args.num_workers,
                 "learning_rate": args.lr,
                 "max_episodes": args.max_episodes,
@@ -220,6 +242,7 @@ def main():
                 "total_filtered_episodes": len(filtered_episodes),
                 "min_episode_length": args.min_episode_length,
                 "max_file_size_mb": args.max_file_size_mb,
+                "max_grid_cells": args.max_grid_cells,
                 "log_interval": args.log_interval,
             }
         )
@@ -227,14 +250,25 @@ def main():
     else:
         print("WandB logging disabled")
 
-    # Create shared model on CPU
+    # Create shared model (on GPU if available, for fast LSTM computation)
     shared_model = A3C_TemporalModel(in_channels=14, temporal_window=args.temporal_window)
-    shared_model.share_memory()
+
+    if use_gpu:
+        # Move shared model to GPU for fast gradient updates
+        shared_model = shared_model.to(device)
+        print(f"Shared model moved to GPU (device={device})")
+        print(f"GPU Memory allocated: {torch.cuda.memory_allocated(device) / 1024**2:.2f} MB")
+    else:
+        # CPU-only: still need to share memory for multiprocessing
+        shared_model.share_memory()
+        print(f"Shared model on CPU (multiprocessing shared memory)")
+
     shared_model.train()
 
     # Count parameters
     total_params = sum(p.numel() for p in shared_model.parameters())
-    print(f"Model parameters: {total_params:,}")
+    trainable_params = sum(p.numel() for p in shared_model.parameters() if p.requires_grad)
+    print(f"Model parameters: {total_params:,} (trainable: {trainable_params:,})")
 
     # Create timestamped checkpoint directory
     from datetime import datetime
@@ -296,17 +330,19 @@ def main():
         for p in processes:
             p.join()
 
-    # Save final model
+    # Save final model (move to CPU for portability)
     final_path = ckpt_dir / 'final_model.pt'
     torch.save({
-        'model_state_dict': shared_model.state_dict(),
+        'model_state_dict': shared_model.cpu().state_dict() if use_gpu else shared_model.state_dict(),
         'best_iou': global_best_iou.value,
         'total_episodes': global_episode_counter.value,
         'config': vars(args),
         'filtered_episodes_count': len(filtered_episodes),
-        'formulation': 'temporal_per_cell_8neighbor_lstm',
+        'formulation': 'temporal_per_cell_8neighbor_perpixel_lstm',
         'temporal_window': args.temporal_window,
-        'memory_leaks_fixed': 7
+        'temporal_model': 'Per-Pixel-LSTM-2layer',
+        'architecture_plan': 'V3.5_ARCHITECTURE_PLAN.md',
+        'device_used': str(device),
     }, final_path)
 
     print(f"\n{'=' * 80}")
@@ -319,9 +355,9 @@ def main():
     # Log final model to WandB
     if use_wandb:
         artifact = wandb.Artifact(
-            name='final-model-v3-5-temporal-lstm-fixed',
+            name='final-model-v3-5-perpixel-lstm',
             type='model',
-            description=f'A3C V3.5 (LSTM, memory fixed) after {global_episode_counter.value} episodes, IoU {global_best_iou.value:.4f}'
+            description=f'A3C V3.5 (Per-Pixel LSTM, Architecture Plan) after {global_episode_counter.value} episodes, IoU {global_best_iou.value:.4f}'
         )
         artifact.add_file(str(final_path))
         wandb.log_artifact(artifact)

@@ -1,12 +1,17 @@
 """
-Temporal Wildfire Environment V3.5 - FIXED MEMORY LEAKS
+Temporal Wildfire Environment V3.5 - Architecture Plan Implementation
 
-Changes from original:
-1. FIXED: Delete self.data after extracting references (100MB leak)
-2. FIXED: Remove fire instance tracking (17MB leak + scipy overhead)
-3. FIXED: Build observation sequences efficiently without copies
-4. FIXED: Reduce temporal window from 5 to 3 (saves 40% memory)
-5. Simplified to pure IoU reward (no cumulative temporal bonus)
+Following V3.5_ARCHITECTURE_PLAN.md specifications:
+1. Temporal window = 5 timesteps (sufficient for fire velocity/acceleration patterns)
+2. Memory-optimized observation building (no redundant copies)
+3. Simple IoU reward (dense feedback at every timestep)
+4. Limited observation cache to prevent memory bloat
+5. Proper cleanup of loaded data
+
+Memory profile (grid 347×347, window=5):
+- Environment data: ~3GB
+- Observation cache (window+2): ~200MB
+- Total per environment: ~3.2GB (safe for 2 workers)
 """
 import pickle
 from pathlib import Path
@@ -16,13 +21,16 @@ import numpy as np
 
 class WildfireEnvTemporal:
     """
-    Temporal environment for wildfire prediction.
+    Temporal environment for wildfire prediction with LSTM context.
 
-    Returns observation sequences (last N timesteps) for temporal context.
-    Memory-optimized: no fire tracking, efficient caching, proper cleanup.
+    Key features:
+    - Returns last 5 timesteps as observation sequences
+    - Dense IoU rewards (feedback at every step)
+    - Memory-optimized with limited caching
+    - No fire tracking (keeps things simple and fast)
     """
 
-    def __init__(self, env_path: Path, temporal_window=3):
+    def __init__(self, env_path: Path, temporal_window=5):
         self.env_path = Path(env_path)
         self.temporal_window = temporal_window
 

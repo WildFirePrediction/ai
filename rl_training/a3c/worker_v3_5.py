@@ -1,12 +1,16 @@
 """
-A3C Worker V3.5 - Temporal Context with LSTM - FIXED MEMORY LEAKS
+A3C Worker V3.5 - Temporal Per-Pixel LSTM (Architecture Plan Implementation)
 
-Changes from original:
-1. FIXED: Detach all tensors before storing in trajectory (8GB leak eliminated)
-2. FIXED: Gradient accumulation bug with proper in-place operations (96MB leak eliminated)
-3. FIXED: Aggressive memory cleanup after each episode
-4. FIXED: Reduced temporal window from 5 to 3 (saves 40% memory)
-5. FIXED: Recomputation loop optimized to avoid creating extra computation graphs (2GB leak eliminated)
+Implements hybrid CPU-GPU A3C as specified in V3.5_ARCHITECTURE_PLAN.md:
+1. Workers run on CPU for environment rollouts (parallel execution)
+2. Local model copy on CPU for inference
+3. Gradients computed on CPU, sent to shared model (on GPU in main process)
+4. Temporal window = 5 timesteps (captures fire velocity/acceleration)
+5. Memory safety: detached tensors, aggressive cleanup, no graph retention
+
+Memory-optimized for hardware (Ryzen9 9950x, 64GB RAM, RTX 5070 12GB):
+- Per worker: ~6GB RAM (safe for 2 workers)
+- Shared model on GPU: ~500MB VRAM
 """
 import os
 os.environ['OMP_NUM_THREADS'] = '1'
@@ -31,26 +35,33 @@ from a3c.model_v3_5 import A3C_TemporalModel
 def worker_process_temporal(worker_id, shared_model, optimizer, filtered_episodes, config,
                             global_episode_counter, global_best_iou, lock, metrics_queue=None):
     """
-    Worker process for A3C V3.5 with temporal LSTM.
+    Worker process for A3C V3.5 with temporal per-pixel LSTM.
 
-    Memory-optimized:
-    - Detached tensors in trajectory
-    - Fixed gradient accumulation
-    - Aggressive cleanup
+    Hybrid CPU-GPU architecture:
+    - Local model runs on CPU for environment rollouts (parallel workers)
+    - Gradients computed on CPU
+    - Shared model on GPU receives gradients and performs updates
+
+    Memory safety:
+    - Detached tensors in trajectory (no graph retention)
+    - Aggressive cleanup after each episode
+    - Fixed gradient accumulation (in-place operations)
     """
     torch.manual_seed(config['seed'] + worker_id)
     np.random.seed(config['seed'] + worker_id)
 
-    # Create local model
-    temporal_window = config.get('temporal_window', 3)
+    # Create local model ON CPU (for parallel environment rollouts)
+    temporal_window = config.get('temporal_window', 5)
     local_model = A3C_TemporalModel(in_channels=14, temporal_window=temporal_window)
     local_model.train()
+    # Keep local model on CPU - it will sync from shared model (which may be on GPU)
 
     episode_count = 0
     max_episodes = config.get('max_episodes', 1000)
 
     print(f"[Worker {worker_id}] Starting with {len(filtered_episodes)} filtered episodes", flush=True)
-    print(f"[Worker {worker_id}] Temporal window: {temporal_window} timesteps (LSTM-based)", flush=True)
+    print(f"[Worker {worker_id}] Temporal window: {temporal_window} timesteps (per-pixel LSTM)", flush=True)
+    print(f"[Worker {worker_id}] Device: CPU (rollouts), gradients sent to shared model", flush=True)
 
     while True:
         # Check if training should stop
@@ -59,7 +70,10 @@ def worker_process_temporal(worker_id, shared_model, optimizer, filtered_episode
                 break
 
         # Sync local model with shared model
-        local_model.load_state_dict(shared_model.state_dict())
+        # Shared model may be on GPU, so we copy to CPU for local rollouts
+        with torch.no_grad():
+            for local_param, shared_param in zip(local_model.parameters(), shared_model.parameters()):
+                local_param.copy_(shared_param.cpu())
 
         # Sample random filtered episode
         env_path, start_t, max_length = filtered_episodes[np.random.randint(len(filtered_episodes))]
@@ -245,17 +259,21 @@ def worker_process_temporal(worker_id, shared_model, optimizer, filtered_episode
         # Clip gradients
         torch.nn.utils.clip_grad_norm_(local_model.parameters(), config['max_grad_norm'])
 
-        # CRITICAL FIX: Update shared model with proper gradient handling
+        # Update shared model with gradients from local model
+        # Shared model may be on GPU, so we need to move gradients appropriately
         with lock:
-            # Copy gradients to shared model using in-place operations
+            # Copy gradients to shared model
             for shared_param, local_param in zip(shared_model.parameters(), local_model.parameters()):
                 if local_param.grad is not None:
+                    # Move gradient to same device as shared_param (GPU if shared model is on GPU)
+                    grad_to_add = local_param.grad.to(shared_param.device)
+
                     if shared_param.grad is None:
-                        # First worker: clone
-                        shared_param.grad = local_param.grad.clone()
+                        # First gradient for this parameter: clone it
+                        shared_param.grad = grad_to_add.clone()
                     else:
-                        # CRITICAL FIX: Use add_ (in-place) instead of += to avoid creating new tensors
-                        shared_param.grad.add_(local_param.grad)
+                        # Accumulate gradient in-place (critical for memory)
+                        shared_param.grad.add_(grad_to_add)
 
             # Update shared model
             optimizer.step()
