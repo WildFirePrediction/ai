@@ -19,6 +19,8 @@
 > **V3** --min-episode-length **4**, --num-workers **2** : **0.0569** (@episode 76)
 >
 > **V3.5** --mel **4**, --num-workers **4** - CRASHED (Memory overflow)
+>
+> **V3.5-Fixed** --mel **4**, --num-workers **1** - **0.1276** (@episode 61)
 
 > **V5** --min-episode-length **4**, --num-workers **4** : **0.1000** (@episode 831)
 >
