@@ -85,6 +85,11 @@ def worker_process_temporal(worker_id, shared_model, optimizer, filtered_episode
             print(f"[Worker {worker_id}] Error loading env: {e}")
             continue
 
+        # Log grid size for memory monitoring
+        grid_cells = env.H * env.W
+        if episode_count % 10 == 0 or grid_cells > 80000:
+            print(f"[Worker {worker_id}] Episode {episode_count} - Grid: {env.H}×{env.W} ({grid_cells:,} cells)", flush=True)
+
         # Fast-forward to start_t
         obs_seq, info = env.reset()
         for _ in range(start_t):
@@ -221,9 +226,14 @@ def worker_process_temporal(worker_id, shared_model, optimizer, filtered_episode
             recomputed_values.append(value_t)
             recomputed_entropies.append(torch.stack(step_entropies).sum())
 
-            # CRITICAL FIX: Delete tensors immediately after use
+            # ULTRA-AGGRESSIVE CLEANUP: Delete ALL tensors from this timestep
+            # This is critical - recomputation loop creates HUGE intermediate tensors
             del state_t, action_t, features, value_t, logits_8d, probs_8d
-            del step_log_probs, step_entropies
+            del step_log_probs, step_entropies, fire_mask_t, action_8d, log_prob_8d, entropy_8d
+
+            # Force garbage collection every 3 timesteps during recomputation
+            if t % 3 == 0:
+                gc.collect()
 
         # Stack into tensors
         log_probs_tensor = torch.stack(recomputed_log_probs)

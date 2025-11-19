@@ -37,23 +37,25 @@ from a3c.worker_v3_5 import worker_process_temporal
 from wildfire_env_temporal_v3_5 import WildfireEnvTemporal
 
 
-def create_filtered_episode_list(env_paths, max_file_size_mb=50, min_episode_length=4, temporal_window=5, max_grid_cells=120000):
+def create_filtered_episode_list(env_paths, max_file_size_mb=50, min_episode_length=4, temporal_window=3, max_grid_cells=50000):
     """
     Pre-scan environments and create list of (env_path, start_timestep) pairs.
 
     CRITICAL: Filters by GRID SIZE to prevent OOM on large grids.
 
-    Conservative filtering for per-pixel LSTM (memory intensive):
-    - Max 120K grid cells (347×347) per environment
-    - With 2 workers: ~6GB RAM per worker, ~12GB total
-    - With 5 timestep window: still safe
+    LAST-RESORT filtering for per-pixel LSTM (EXTREMELY memory intensive):
+    - Max 50K grid cells (224×224) per environment
+    - Temporal window: 3 (down from 5) - saves 40% memory
+    - With chunked LSTM (10K chunks): ~3GB RAM per worker
+    - 1 WORKER ONLY: ~6GB total RAM (per-pixel LSTM is too heavy for 2 workers)
+    - Recomputation loop + per-pixel LSTM = OOM with 2 workers
 
     Args:
         env_paths: List of environment file paths
         max_file_size_mb: Skip files larger than this
         min_episode_length: Minimum timesteps with burns required
         temporal_window: Temporal window size (default 5 for V3.5)
-        max_grid_cells: Maximum H×W cells (default 120K = 347×347 for safety)
+        max_grid_cells: Maximum H×W cells (default 100K = 316×316, CRASH-PROOF)
 
     Returns:
         List of (env_path, start_timestep, episode_length) tuples
@@ -134,9 +136,9 @@ def create_filtered_episode_list(env_paths, max_file_size_mb=50, min_episode_len
 def main():
     parser = argparse.ArgumentParser(description='A3C V3.5 Training - Temporal Per-Pixel LSTM')
     parser.add_argument('--repo-root', type=str, default='/home/chaseungjoon/code/WildfirePrediction')
-    parser.add_argument('--num-workers', type=int, default=2, help='Number of parallel CPU workers (default 2 for safety)')
+    parser.add_argument('--num-workers', type=int, default=1, help='Number of parallel CPU workers (default 1 - per-pixel LSTM is too heavy for 2 workers!)')
     parser.add_argument('--max-episodes', type=int, default=1000, help='Total episodes across all workers')
-    parser.add_argument('--temporal-window', type=int, default=5, help='Temporal window size (default 5 per architecture plan)')
+    parser.add_argument('--temporal-window', type=int, default=3, help='Temporal window size (default 3 - reduced from 5 to prevent OOM)')
     parser.add_argument('--lr', type=float, default=7e-5, help='Learning rate')
     parser.add_argument('--gamma', type=float, default=0.99, help='Discount factor')
     parser.add_argument('--value-loss-coef', type=float, default=0.5, help='Value loss coefficient')
@@ -145,7 +147,7 @@ def main():
     parser.add_argument('--seed', type=int, default=42, help='Random seed')
     parser.add_argument('--max-envs', type=int, default=None, help='Limit number of training environments')
     parser.add_argument('--max-file-size-mb', type=int, default=50, help='Max environment file size in MB')
-    parser.add_argument('--max-grid-cells', type=int, default=120000, help='Max grid size (H×W) for safety (default 120K = 347×347)')
+    parser.add_argument('--max-grid-cells', type=int, default=50000, help='Max grid size (H×W) for safety (default 50K = 224×224, LAST-RESORT)')
     parser.add_argument('--min-episode-length', type=int, default=4, help='Min timesteps with burns per episode (mel4)')
     parser.add_argument('--log-interval', type=int, default=10, help='Log every N episodes')
     parser.add_argument('--wandb-project', type=str, default='wildfire-prediction', help='WandB project name')
@@ -175,16 +177,20 @@ def main():
     device = torch.device('cuda' if use_gpu else 'cpu')
 
     print(f"=" * 80)
-    print(f"A3C V3.5 Training - Temporal Per-Pixel LSTM (Architecture Plan)")
+    print(f"A3C V3.5 Training - Per-Pixel LSTM (EMERGENCY MODE)")
     print(f"=" * 80)
-    print(f"Problem: Per-cell 8-neighbor prediction + TEMPORAL CONTEXT (per-pixel LSTM)")
-    print(f"Temporal window: {args.temporal_window} timesteps (fire velocity & acceleration)")
-    print(f"Temporal model: Per-Pixel LSTM (2 layers, hidden=128) - NOT 3D Conv!")
+    print(f"⚠️  WARNING: Per-pixel LSTM is EXTREMELY memory-intensive")
+    print(f"⚠️  Hardware limits forced severe restrictions:")
+    print(f"    - Temporal window: {args.temporal_window} (reduced from 5)")
+    print(f"    - Max grid: {args.max_grid_cells:,} cells (224×224)")
+    print(f"    - Workers: {args.num_workers} (2 workers = OOM crash)")
+    print(f"    - LSTM chunk: 10K pixels (~40MB/chunk)")
+    print(f"=" * 80)
+    print(f"Problem: Per-cell 8-neighbor + Per-Pixel LSTM temporal context")
+    print(f"Temporal model: Per-Pixel LSTM (2 layers, hidden=128)")
     print(f"Architecture: Hybrid CPU-GPU (global model on GPU, workers on CPU)")
-    print(f"Device: {device} (GPU utilization: {'YES' if use_gpu else 'NO - use --cpu-only to force CPU'})")
-    print(f"Rewards: DENSE IoU at every timestep")
-    print(f"Grid filter: max {args.max_grid_cells:,} cells (347×347, conservative for LSTM)")
-    print(f"Expected memory: ~{args.num_workers * 6}GB RAM ({args.num_workers} workers × 6GB)")
+    print(f"Device: {device} (GPU utilization: {'YES' if use_gpu else 'NO'})")
+    print(f"Expected memory: ~6GB RAM (1 worker, EXTREMELY TIGHT)")
     print(f"Expected VRAM: ~500MB (global model on GPU)" if use_gpu else "")
     print(f"=" * 80)
     print(f"Training environments: {len(train_paths)}")

@@ -84,12 +84,15 @@ class A3C_TemporalModel(nn.Module):
         """
         Encode temporal observation sequence with per-pixel LSTM.
 
-        This is the CORE of V3.5 - captures fire spread velocity and acceleration.
+        MEMORY-SAFE VERSION with CHUNKED PROCESSING:
+        - Large grids (e.g., 387×387 = 149K pixels) are processed in chunks
+        - Prevents memory spikes from processing all pixels at once
+        - Each chunk is 30K pixels max (~120MB per forward pass)
 
         Architecture plan process:
         1. CNN encodes each timestep independently: (B, T, C, H, W) → (B, T, 128, H, W)
         2. Reshape to per-pixel sequences: (B*H*W, T, 128)
-        3. LSTM processes each pixel's temporal evolution
+        3. LSTM processes pixels IN CHUNKS (memory-safe)
         4. Reshape back to spatial: (B, 128, H, W)
 
         Args:
@@ -111,17 +114,33 @@ class A3C_TemporalModel(nn.Module):
         # Step 2: Reshape to per-pixel sequences
         # (B, T, 128, H, W) → (B, H, W, T, 128) → (B*H*W, T, 128)
         x = feature_seq.permute(0, 3, 4, 1, 2)  # (B, H, W, T, 128)
-        x = x.reshape(B * H * W, T, self.hidden_dim)  # (B*H*W, T, 128)
+        total_pixels = B * H * W
+        x = x.reshape(total_pixels, T, self.hidden_dim)  # (B*H*W, T, 128)
 
-        # Step 3: Process temporal sequences with LSTM
-        # Each of the B*H*W pixels has a T-length sequence
-        # LSTM learns: fire velocity (change between timesteps),
-        #              acceleration (change in velocity),
-        #              wind dynamics, humidity trends
-        lstm_out, _ = self.lstm(x)  # (B*H*W, T, hidden_dim)
+        # Step 3: Process temporal sequences with CHUNKED LSTM
+        # CRITICAL: Process in chunks to prevent memory explosion
+        # Chunk size: 10K pixels = ~40MB per forward pass (ULTRA-SAFE for recomputation loop)
+        # Reduced from 30K because recomputation does this multiple times per episode
+        chunk_size = 10000
+        lstm_outputs = []
 
-        # Take last timestep output (contains full temporal context)
-        temporal_features = lstm_out[:, -1, :]  # (B*H*W, hidden_dim)
+        for i in range(0, total_pixels, chunk_size):
+            chunk = x[i:i+chunk_size]  # (chunk_size, T, 128)
+
+            # Process this chunk through LSTM
+            chunk_out, _ = self.lstm(chunk)  # (chunk_size, T, hidden_dim)
+
+            # Take last timestep output
+            chunk_final = chunk_out[:, -1, :]  # (chunk_size, hidden_dim)
+
+            lstm_outputs.append(chunk_final)
+
+            # CRITICAL: Delete intermediate tensors immediately
+            del chunk, chunk_out
+
+        # Concatenate all chunks
+        temporal_features = torch.cat(lstm_outputs, dim=0)  # (B*H*W, hidden_dim)
+        del lstm_outputs, x, feature_seq
 
         # Step 4: Reshape back to spatial
         temporal_features = temporal_features.reshape(B, H, W, self.hidden_dim)
