@@ -8,6 +8,7 @@
 
 # directories
 data
+embedded_data
 tilling_data
 rl_training/supervised/checkpoints_unet/best_model
 wandb
