@@ -133,9 +133,14 @@ for _, reg in tqdm(regions_df.iterrows(), total=len(regions_df), desc='  Windows
         fi[nz] /= cnt[nz]
         ft[nz] /= cnt[nz]
         # Weather: [temp, humidity, wind_speed, wind_x, wind_y, rainfall]
+        # Use available columns or defaults
         weather = np.array([
-            dets['te'].mean(), dets['rh'].mean(), dets['w'].mean(),
-            dets['d_x'].mean(), dets['d_y'].mean(), dets['r'].mean()
+            dets['te'].mean() if 'te' in dets.columns else 0.0,
+            dets['rh'].mean() if 'rh' in dets.columns else 0.0,
+            dets['w'].mean() if 'w' in dets.columns else 0.0,
+            dets['d_x'].mean() if 'd_x' in dets.columns else 0.0,
+            dets['d_y'].mean() if 'd_y' in dets.columns else 0.0,
+            dets['r'].mean() if 'r' in dets.columns else 0.0
         ], dtype=np.float32)
         weather = np.nan_to_num(weather, nan=0.0)
 

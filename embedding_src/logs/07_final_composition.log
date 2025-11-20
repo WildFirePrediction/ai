@@ -1,0 +1,101 @@
+================================================================================
+FINAL STATE COMPOSITION
+================================================================================
+
+[1/5] Loading all embedded data sources...
+
+  [Fire Data]
+    Loading NASA VIIRS data (without weather)...
+    ✓ NASA VIIRS: 115,799 fire detections
+    ✓ Episodes: 130
+
+  [Topography]
+    Loading DEM/RSP raster...
+    ✓ DEM: (1710, 1645) (10.7MB)
+    ✓ RSP: (1710, 1645) (10.7MB)
+
+  [Land Cover]
+    Loading LCM raster...
+    ✓ LCM: (1710, 1645), 8 classes (5.4MB)
+    ✓ Mapping: 8 total classes
+
+  [Forest Stand]
+    Loading FSM raster...
+    ✓ FSM: (1710, 1645), 4 types (5.4MB)
+    ✓ Mapping: 4 total types
+
+  [Vegetation]
+    Loading NDVI raster...
+    ✓ NDVI: (1710, 1645), 1 band(s) (10.7MB)
+
+  [Weather]
+    ℹ️  Weather is temporal (per fire detection)
+    ℹ️  Loaded with fire data in nasa_viirs_with_weather.parquet
+    ℹ️  Not creating static weather grid
+
+[2/5] Verifying data alignment...
+  DEM: (1710, 1645)
+  RSP: (1710, 1645)
+  LCM: (1710, 1645)
+  FSM: (1710, 1645)
+  NDVI: (1710, 1645)
+
+  ✓ All data aligned to grid: (1710, 1645)
+
+[3/5] Creating base state grid...
+  Stacking 3 continuous features...
+  Continuous state tensor: (3, 1710, 1645) (32.2MB)
+  Features (3): ['dem_norm', 'rsp_norm', 'ndvi_norm']
+  LCM classes: (1710, 1645), unique: 8
+  FSM classes: (1710, 1645), unique: 4
+
+  Categorical features: ['lcm', 'fsm']
+
+[4/5] Creating fire episode index...
+  Created episode index: 129 episodes
+  Mean duration: 90816.34 hours
+  Mean detections per episode: 854.2
+  Saved to: /home/chaseungjoon/code/WildfirePrediction/embedded_data/episode_index.parquet
+
+[5/5] Saving final state data...
+  Saved state vectors to: /home/chaseungjoon/code/WildfirePrediction/embedded_data/state_vectors.npz
+  File size: 6.21 MB
+
+  Saved arrays:
+    continuous_features: (3, 1710, 1645)
+    lcm_classes: (1710, 1645)
+    fsm_classes: (1710, 1645)
+  Saved grid metadata to: /home/chaseungjoon/code/WildfirePrediction/embedded_data/grid_metadata.json
+
+================================================================================
+FINAL STATE COMPOSITION COMPLETE
+================================================================================
+
+📊 Summary:
+  Grid: 1645 x 1710 @ 400m resolution
+  CRS: EPSG:5179
+  Continuous features: 3
+  Categorical features: 2
+  Fire episodes: 129
+  Fire detections: 115,799
+
+💾 Output files:
+  - dem_rsp_embedded.tif (5.05 MB)
+  - dem_rsp_norm_stats.json (0.00 MB)
+  - episode_index.parquet (0.02 MB)
+  - fsm_class_mapping.json (0.00 MB)
+  - fsm_embedded.tif (0.16 MB)
+  - grid_metadata.json (0.00 MB)
+  - kma_weather_embedded.tif (16.56 MB)
+  - kma_weather_norm_stats.json (0.00 MB)
+  - lcm_class_mapping.json (0.00 MB)
+  - lcm_embedded.tif (0.23 MB)
+  - nasa_viirs_embedded.parquet (8.24 MB)
+  - nasa_viirs_episode_index.parquet (0.01 MB)
+  - nasa_viirs_norm_stats.json (0.00 MB)
+  - ndvi_embedded.tif (2.97 MB)
+  - ndvi_norm_stats.json (0.00 MB)
+  - state_vectors.npz (6.21 MB)
+
+🚀 Ready for RL training!
+================================================================================

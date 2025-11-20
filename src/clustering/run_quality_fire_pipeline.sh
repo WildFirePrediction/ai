@@ -6,8 +6,11 @@
 
 set -e  # Exit on error
 
-REPO_ROOT="/home/chaseungjoon/code/WildfirePrediction-SSD"
+REPO_ROOT="/home/chaseungjoon/code/WildfirePrediction"
 cd "$REPO_ROOT"
+
+# Activate virtual environment
+source .venv/bin/activate
 
 echo "============================================================"
 echo " QUALITY FIRE DATA PIPELINE"

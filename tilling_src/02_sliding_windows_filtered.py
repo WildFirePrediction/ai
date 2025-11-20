@@ -91,7 +91,7 @@ def create_sliding_windows(df_fire, window_hours=48, stride_hours=24):
 
 
 def main():
-    repo_root = Path('/')
+    repo_root = Path('/home/chaseungjoon/code/WildfirePrediction')
 
     # Load filtered VIIRS data
     filtered_dir = repo_root / 'data' / 'filtered_fires'

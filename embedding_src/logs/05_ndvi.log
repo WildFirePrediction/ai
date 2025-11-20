@@ -1,0 +1,45 @@
+================================================================================
+NDVI EMBEDDING
+================================================================================
+
+[1/5] Loading grid configuration...
+Grid configuration loaded
+  Origin: (688800.00, 1434800.00)
+  Dimensions: 1645 x 1710
+
+[2/5] Loading NDVI data...
+Found 1 NDVI files
+  - MOD13Q1.061_250m_aid0001.nc
+Note: Processing only 3 most recent NDVI files to conserve memory...
+  Loading: MOD13Q1.061_250m_aid0001.nc...
+    Using variable: _250m_16_days_NDVI
+    Found time dimension with 17 timesteps
+    Loaded: MOD13Q1.061_250m_aid0001.nc - Shape: (2401, 3361), Range: [-0.200, 0.997]
+
+Loaded 1 NDVI files successfully
+
+[3/5] Normalizing NDVI...
+NDVI normalization completed
+Sample normalized NDVI range: [0.0000, 0.9987]
+
+[4/5] Reprojecting to 400m grid...
+  Reprojecting MOD13Q1.061_250m_aid0001.nc...
+
+Current NDVI statistics:
+  Shape: (1710, 1645)
+  Range: [0.0000, 0.9346]
+  Mean: 0.1944
+
+[5/5] Saving embedded data...
+Saved embedded data to: ../embedded_data/ndvi_embedded.tif
+Bands: 1
+File size: 2.97 MB
+Saved NDVI statistics to: ../embedded_data/ndvi_norm_stats.json
+
+================================================================================
+NDVI EMBEDDING COMPLETE
+================================================================================
+✓ Processed 1 NDVI files
+✓ Normalized to [0, 1] range
+✓ Reprojected to 1645x1710 @ 400m resolution
+✓ Ready for next stage

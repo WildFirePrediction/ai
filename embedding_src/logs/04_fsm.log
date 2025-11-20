@@ -1,0 +1,73 @@
+================================================================================
+FOREST STAND MAP (FSM) EMBEDDING
+================================================================================
+
+[1/6] Loading grid configuration...
+Grid configuration loaded
+  Origin: (688800.00, 1434800.00)
+  Dimensions: 1645 x 1710
+
+[2/6] Loading Forest Stand Map shapefiles from all provinces...
+Found 17 province directories:
+  - 울산광역시
+  - 경기도
+  - 충청남도
+  - 전북특별자치도
+  - 세종특별자치시
+  - 인천광역시
+  - 대구광역시
+  - 경상남도
+  - 서울특별시
+  - 광주광역시
+  - 경상북도
+  - 강원특별자치도
+  - 전라남도
+  - 충청북도
+  - 대전광역시
+  - 제주특별자치도
+  - 부산광역시
+
+Total shapefiles: 19
+Note: Processing in batches to conserve memory...
+
+[3/6] Identifying forest type column from sample file...
+Available columns: ['STORUNST', 'FROR_CD', 'FRTP_CD', 'KOFTR_GROU', 'DMCLS_CD', 'AGCLS_CD', 'DNST_CD', 'HEIGHT', 'LDMARK_STN', 'MAP_LABEL', '갱신년도', 'ETC_PCMTT', 'FRTP_NM', 'KOFTR_NM', 'DMCLS_NM', 'AGCLS_NM', 'DNST_NM', 'HEIGHT_NM', 'Shape_Leng', 'Shape_Area', 'geometry']
+Potential forest type columns: []
+Using forest type column: 'STORUNST'
+
+[4/6] Processing 19 files ONE AT A TIME (memory efficient)...
+Building type mapping and raster incrementally...
+
+Processing completed in 4.3 minutes
+Successfully processed: 19/19 files
+Errors: 0
+
+[5/6] Creating final type mapping...
+Number of forest types: 3
+
+Forest type mapping (first 15):
+  1 -> 1
+  2 -> 2
+  0 -> 3
+Rasterization completed
+Unique values in raster: 4
+Value range: [0, 3]
+
+[6/6] Saving embedded data...
+Saved embedded data to: ../embedded_data/fsm_embedded.tif
+File size: 0.16 MB
+Saved type mapping to: ../embedded_data/fsm_class_mapping.json
+
+Forest Type Coverage (Top 10):
+  0     No Data                         2,256,277 pixels (80.21%)
+  1     1                                 310,114 pixels (11.02%)
+  2     2                                 246,409 pixels ( 8.76%)
+  3     0                                     150 pixels ( 0.01%)
+
+================================================================================
+FSM EMBEDDING COMPLETE
+================================================================================
+✓ Processed 19 shapefiles from 17 provinces
+✓ 3 forest types (excluding no-data)
+✓ Rasterized to 1645x1710 grid
+✓ Ready for next stage
