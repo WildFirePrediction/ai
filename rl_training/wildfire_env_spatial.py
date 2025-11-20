@@ -93,17 +93,19 @@ class WildfireEnvSpatial:
         fire_temp = np.clip((self.fire_temps[t] + 20) / 60.0, 0, 1).astype(np.float32)[None, ...]
         fire_age = np.clip(self.fire_ages[t] / 1000.0, 0, 1).astype(np.float32)[None, ...]
 
-        # Weather (5) - broadcast to spatial dimensions
+        # Weather (6) - broadcast to spatial dimensions
+        # [temp, humidity, wind_speed, wind_x, wind_y, rainfall]
         w = self.weather_states[t].astype(np.float32)
         w_normalized = np.zeros_like(w)
-        w_normalized[0] = np.clip((w[0] + 10) / 50.0, 0, 1)
-        w_normalized[1] = np.clip(w[1] / 100.0, 0, 1)
-        w_normalized[2] = np.clip(w[2] / 20.0, 0, 1)
-        w_normalized[3] = np.clip(w[3] / 20.0, 0, 1)
-        w_normalized[4] = np.clip(w[4] / 50.0, 0, 1)
+        w_normalized[0] = np.clip((w[0] + 10) / 50.0, 0, 1)  # temp
+        w_normalized[1] = np.clip(w[1] / 100.0, 0, 1)        # humidity
+        w_normalized[2] = np.clip(w[2] / 20.0, 0, 1)         # wind_speed
+        w_normalized[3] = np.clip(w[3] / 20.0, 0, 1)         # wind_x
+        w_normalized[4] = np.clip(w[4] / 20.0, 0, 1)         # wind_y
+        w_normalized[5] = np.clip(w[5] / 50.0, 0, 1)         # rainfall
         weather = np.tile(w_normalized[:, None, None], (1, self.H, self.W))
 
-        # Concatenate all features: (14, H, W)
+        # Concatenate all features: (15, H, W)
         obs = np.concatenate([
             static_cont,      # (3, H, W)
             lcm,              # (1, H, W)
@@ -112,7 +114,7 @@ class WildfireEnvSpatial:
             fire_intensity,   # (1, H, W)
             fire_temp,        # (1, H, W)
             fire_age,         # (1, H, W)
-            weather           # (5, H, W)
+            weather           # (6, H, W)
         ], axis=0).astype(np.float32)
 
         return obs

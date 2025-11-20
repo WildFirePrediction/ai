@@ -194,7 +194,7 @@ def main():
         print("WandB logging disabled")
 
     # Create shared model on CPU
-    shared_model = A3C_PerCellModel(in_channels=14)
+    shared_model = A3C_PerCellModel(in_channels=15)
     shared_model.share_memory()
     shared_model.train()
 

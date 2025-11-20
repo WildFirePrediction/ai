@@ -53,7 +53,7 @@ def worker_process_correct(worker_id, shared_model, optimizer, filtered_episodes
     np.random.seed(config['seed'] + worker_id)
 
     # Create local model
-    local_model = A3C_PerCellModel(in_channels=14)
+    local_model = A3C_PerCellModel(in_channels=15)
     local_model.train()
 
     episode_count = 0
