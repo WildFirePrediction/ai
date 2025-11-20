@@ -34,6 +34,10 @@
 > 
 > **V7.5** --min-episode-length **4**, --num-workers **4** : **0.09262** (@episode 982)
 
+=========== RE-EMBED AND RE-TILE ===============
+
+> **V3** --mel 4, --num-workers 4 : **0.3182** (@episode 1416)
+
 ---
 
 # RL
