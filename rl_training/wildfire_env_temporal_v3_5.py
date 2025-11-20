@@ -121,8 +121,8 @@ class WildfireEnvTemporal:
         FIXED: Pre-allocate array and fill without creating intermediate lists.
         Returns last temporal_window timesteps.
         """
-        # Pre-allocate output array
-        obs_seq = np.zeros((self.temporal_window, 14, self.H, self.W), dtype=np.float32)
+        # Pre-allocate output array (15 channels: 3 static + 2 categorical + 4 fire + 6 weather)
+        obs_seq = np.zeros((self.temporal_window, 15, self.H, self.W), dtype=np.float32)
 
         for i in range(self.temporal_window):
             t_i = t - (self.temporal_window - 1 - i)
@@ -162,30 +162,32 @@ class WildfireEnvTemporal:
         # Fire (4)
         fire_mask = self.fire_masks[t].astype(np.float32)[None, ...]
         fire_intensity = np.clip(self.fire_intensities[t] / 5.0, 0, 1).astype(np.float32)[None, ...]
-        fire_temp = np.clip((self.fire_temps[t] + 20) / 60.0, 0, 1).astype(np.float32)[None, ...]
+        # Fire brightness temp in Kelvin (280-600K range): normalize to [0, 1]
+        fire_temp = np.clip((self.fire_temps[t] - 280) / 320.0, 0, 1).astype(np.float32)[None, ...]
         fire_age = np.clip(self.fire_ages[t] / 1000.0, 0, 1).astype(np.float32)[None, ...]
 
-        # Weather (5)
+        # Weather (6): [temp, humidity, wind_speed, wind_x, wind_y, rainfall]
         w = self.weather_states[t].astype(np.float32)
         w_normalized = np.zeros_like(w)
-        w_normalized[0] = np.clip((w[0] + 10) / 50.0, 0, 1)
-        w_normalized[1] = np.clip(w[1] / 100.0, 0, 1)
-        w_normalized[2] = np.clip(w[2] / 50.0, 0, 1)
-        w_normalized[3] = np.clip(w[3] / 360.0, 0, 1)
-        w_normalized[4] = np.clip(w[4] / 100.0, 0, 1)
+        w_normalized[0] = np.clip((w[0] + 10) / 50.0, 0, 1)     # Temp: -10°C to 40°C
+        w_normalized[1] = np.clip(w[1] / 100.0, 0, 1)           # Humidity: 0-100%
+        w_normalized[2] = np.clip(w[2] / 50.0, 0, 1)            # Wind speed: 0-50 m/s
+        w_normalized[3] = np.clip((w[3] + 1) / 2.0, 0, 1)       # Wind X: -1 to 1
+        w_normalized[4] = np.clip((w[4] + 1) / 2.0, 0, 1)       # Wind Y: -1 to 1
+        w_normalized[5] = np.clip(w[5] / 100.0, 0, 1)           # Rainfall: 0-100 mm
 
         weather_spatial = np.tile(w_normalized[:, None, None], (1, self.H, self.W))
 
-        # Concatenate: (14, H, W)
+        # Concatenate: (15, H, W)
         obs = np.concatenate([
             static_cont,      # 0-2: elevation, slope, aspect
             lcm,              # 3: land cover
             fsm,              # 4: fuel spatial model
             fire_mask,        # 5: fire mask
             fire_intensity,   # 6: fire intensity
-            fire_temp,        # 7: fire temperature
+            fire_temp,        # 7: fire temperature (BRIGHTNESS from VIIRS)
             fire_age,         # 8: fire age
-            weather_spatial,  # 9-13: weather (temp, humidity, wind_speed, wind_dir, precip)
+            weather_spatial,  # 9-14: weather (temp, humidity, wind_speed, wind_x, wind_y, rainfall)
         ], axis=0).astype(np.float32)
 
         return obs

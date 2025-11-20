@@ -124,7 +124,7 @@ for _, reg in tqdm(regions_df.iterrows(), total=len(regions_df), desc='  Windows
             if 0 <= rr < H and 0 <= cc < W:
                 fm[rr, cc] = 1
                 fi[rr, cc] += float(drow['i'])
-                ft[rr, cc] += float(drow['te'])
+                ft[rr, cc] += float(drow['BRIGHTNESS'])  # Use fire brightness temperature
                 # age since episode start
                 age_h = (drow['datetime'] - t_start).total_seconds() / 3600.0
                 fa[rr, cc] = max(fa[rr, cc], age_h)
@@ -132,8 +132,10 @@ for _, reg in tqdm(regions_df.iterrows(), total=len(regions_df), desc='  Windows
         nz = cnt > 0
         fi[nz] /= cnt[nz]
         ft[nz] /= cnt[nz]
+        # Weather: [temp, humidity, wind_speed, wind_x, wind_y, rainfall]
         weather = np.array([
-            dets['w'].mean(), dets['d_x'].mean(), dets['d_y'].mean(), dets['rh'].mean(), dets['r'].mean()
+            dets['te'].mean(), dets['rh'].mean(), dets['w'].mean(),
+            dets['d_x'].mean(), dets['d_y'].mean(), dets['r'].mean()
         ], dtype=np.float32)
         weather = np.nan_to_num(weather, nan=0.0)
 

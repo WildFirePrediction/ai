@@ -1,0 +1,59 @@
+================================================================================
+FOREST STAND MAP (FSM) EMBEDDING
+================================================================================
+
+[1/6] Loading grid configuration...
+Grid configuration loaded
+  Origin: (-64800.00, 36800.00)
+  Dimensions: 1804 x 2863
+
+[2/6] Loading Forest Stand Map shapefiles from all provinces...
+Found 17 province directories:
+  - 울산광역시
+  - 경기도
+  - 충청남도
+  - 전북특별자치도
+  - 세종특별자치시
+  - 인천광역시
+  - 대구광역시
+  - 경상남도
+  - 서울특별시
+  - 광주광역시
+  - 경상북도
+  - 강원특별자치도
+  - 전라남도
+  - 충청북도
+  - 대전광역시
+  - 제주특별자치도
+  - 부산광역시
+
+Total shapefiles: 19
+Note: Processing in batches to conserve memory...
+
+[3/6] Identifying forest type classes from sample...
+Available columns: ['STORUNST', 'FROR_CD', 'FRTP_CD', 'KOFTR_GROU', 'DMCLS_CD', 'AGCLS_CD', 'DNST_CD', 'HEIGHT', 'LDMARK_STN', 'MAP_LABEL', '갱신년도', 'ETC_PCMTT', 'FRTP_NM', 'KOFTR_NM', 'DMCLS_NM', 'AGCLS_NM', 'DNST_NM', 'HEIGHT_NM', 'Shape_Leng', 'Shape_Area', 'geometry']
+Potential forest type columns: []
+Using forest type column: 'STORUNST'
+
+Scanning all files for unique forest types...
+This may take a while - please be patient...
+Scanning types:   0%|          | 0/19 [00:00<?, ?it/s]Scanning types:   5%|▌         | 1/19 [00:00<00:04,  4.44it/s]Scanning types:  11%|█         | 2/19 [00:01<00:16,  1.05it/s]Scanning types:  16%|█▌        | 3/19 [00:03<00:22,  1.42s/it]Scanning types:  21%|██        | 4/19 [00:05<00:21,  1.44s/it]Scanning types:  26%|██▋       | 5/19 [00:05<00:14,  1.01s/it]Scanning types:  32%|███▏      | 6/19 [00:05<00:09,  1.43it/s]Scanning types:  37%|███▋      | 7/19 [00:05<00:06,  1.80it/s]Scanning types:  42%|████▏     | 8/19 [00:07<00:10,  1.06it/s]Scanning types:  47%|████▋     | 9/19 [00:07<00:07,  1.42it/s]Scanning types:  58%|█████▊    | 11/19 [00:10<00:07,  1.04it/s]Scanning types:  63%|██████▎   | 12/19 [00:13<00:10,  1.54s/it]Scanning types:  68%|██████▊   | 13/19 [00:15<00:10,  1.74s/it]Scanning types:  74%|███████▎  | 14/19 [00:18<00:09,  1.89s/it]Scanning types:  79%|███████▉  | 15/19 [00:21<00:08,  2.21s/it]Scanning types:  84%|████████▍ | 16/19 [00:23<00:06,  2.29s/it]Scanning types:  89%|████████▉ | 17/19 [00:23<00:03,  1.73s/it]Scanning types:  95%|█████████▍| 18/19 [00:24<00:01,  1.28s/it]Scanning types: 100%|██████████| 19/19 [00:24<00:00,  1.07it/s]Scanning types: 100%|██████████| 19/19 [00:24<00:00,  1.27s/it]
+
+Scanning complete! Converting to sorted list...
+
+Unique forest types found: 3
+
+[4/6] Creating integer encoding for forest types...
+Number of forest types: 3
+
+Forest type mapping (first 15):
+  0 -> 1
+  1 -> 2
+  2 -> 3
+  nan -> 0
+
+[5/6] Rasterizing to 400m grid (batch processing to conserve memory)...
+This will take a while - processing forest stand shapefiles...
+Processing 19 files in 1 batches of 50...
+Estimated time: 3+ seconds (~0.1 minutes)
+Rasterizing batches:   0%|          | 0/1 [00:00<?, ?batch/s]
