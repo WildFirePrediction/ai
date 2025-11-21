@@ -3,8 +3,9 @@
 ## Current Status
 - **Best Model:** A3C V3 (8-neighbor, 417K params)
 - **Best Performance:** 40.91% IoU (4 workers, min-len 4)
-- **Target:** 70% IoU for production
-- **Gap to Close:** ~30% IoU improvement needed
+- **Target:** 70% IoU
+
+- **Data:** Re-embedded and re-tiled weather data (14 channels -> 15), need to tweak models accordingly
 
 ---
 
@@ -18,17 +19,7 @@
 - Effective dataset size: 502 → 2000+ episodes
 - Fire spread physics are rotation/flip invariant
 
-**Implementation:**
-```python
-def augment_episode(obs, fire_mask, burn_mask):
-    # Random rotation (0, 90, 180, 270 degrees)
-    # Random flip (horizontal, vertical)
-    return augmented_obs, augmented_fire_mask, augmented_burn_mask
-```
-
-**Expected Gain:** +5-7% IoU
-**Difficulty:** Easy
-**Status:** ✅ Implemented in V6
+**Status:** Implemented in V6
 **Result:** Modest gain to 36.36% IoU
 
 ---
@@ -41,41 +32,14 @@ def augment_episode(obs, fire_mask, burn_mask):
 - Replay 30% of training from buffer
 - Balance new exploration with exploitation of known good experiences
 
-**Implementation:**
-```python
-class ReplayBuffer:
-    def __init__(self, capacity=100):
-        self.buffer = []  # Store (env_path, start_t, IoU)
-
-    def add_if_good(self, episode_info):
-        # Keep top K episodes by IoU
-
-    def sample(self, batch_size):
-        # Sample episodes for replay
-```
-
 **Expected Gain:** +3-5% IoU (reduces forgetting)
 **Difficulty:** Easy
-**Status:** ✅ Implemented in V6
+**Status:** Implemented in V6
 **Result:** Modest gain to 36.36% IoU
 
 ---
 
-### 1.3 Improved Episode Filtering
-**Problem:** min-len 4 = 502 episodes, min-len 5 = 90 episodes (too sparse)
-
-**Options:**
-- **A) Weighted Sampling:** Oversample longer episodes (min-len 4-5) 2x
-- **B) Soft Filtering:** Use min-len 3 but weight by episode quality
-- **C) Dynamic Threshold:** Start with min-len 3, gradually increase to 4
-
-**Expected Gain:** +1-2% IoU
-**Difficulty:** Easy
-**Status:** Not yet implemented
-
----
-
-## Phase 2: Architecture Enhancements (Target: 50-60% IoU, 1-2 weeks)
+## Phase 2: Architecture Enhancements
 
 ### 2.1 Spatial Attention Mechanism
 **Problem:** Model treats all regions equally, doesn't focus on fire front
@@ -112,13 +76,6 @@ class SpatialAttention(nn.Module):
 **Proposed:** `[obs_{t-2}, obs_{t-1}, obs_t]` → LSTM → policy
 
 **V7 Attempt (FAILED - 8.13% IoU, -80% vs V3):**
-```python
-# What V7 tried (WRONG):
-- Reduced encoder: 14 → 32 → 64 (cut 128-channel layer)
-- Used 3D Conv instead of LSTM ("lighter")
-- Window size: 3 timesteps
-- Result: Catastrophic failure
-```
 
 **Why V7 Failed:**
 1. **3D Conv ≠ LSTM**: 3D convolutions capture local spatial-temporal patterns, but lack memory/state
@@ -126,38 +83,14 @@ class SpatialAttention(nn.Module):
 3. **Reduced encoder capacity**: Cut from 128 to 64 channels, lost representation power
 4. **Window too small**: 3 timesteps insufficient for meaningful temporal patterns
 
-**Correct Implementation (V7.1 Plan):**
-```python
-class TemporalEncoder(nn.Module):
-    def __init__(self, feature_dim=128):  # Keep 128 channels!
-        super().__init__()
-        # 1. Use FULL V3 encoder (32→64→128), don't reduce capacity
-        self.cnn_encoder = V3Encoder()
-
-        # 2. Use LSTM (not 3D conv) for temporal state
-        self.lstm = nn.LSTM(
-            input_size=128,  # Match V3 encoder output
-            hidden_size=128,
-            num_layers=2,
-            batch_first=True,
-            dropout=0.1
-        )
-
-        # 3. Add layer norm for stability
-        self.layer_norm = nn.LayerNorm(128)
-
-    def forward(self, feature_sequence):
-        # feature_sequence: (B, T, C, H, W) where T=5 (not 3!)
-        # Process temporal dimension with LSTM
-        return temporal_features
-```
+**Correct Implementation (V7.5):**
 
 **Critical Changes from V7:**
-1. ✅ Keep FULL V3 encoder (128 channels)
-2. ✅ Use LSTM (not 3D conv) - proper temporal state
-3. ✅ Increase window to 5 timesteps (not 3)
-4. ✅ Add layer norm for training stability
-5. ✅ ~480K params total (~350K encoder + ~130K LSTM)
+1. Keep FULL V3 encoder (128 channels)
+2. Use LSTM (not 3D conv) - proper temporal state
+3. Increase window to 5 timesteps (not 3)
+4. Add layer norm for training stability
+5. ~480K params total (~350K encoder + ~130K LSTM)
 
 **Benefits:**
 - Capture fire spread velocity
@@ -167,33 +100,12 @@ class TemporalEncoder(nn.Module):
 
 **Expected Gain:** +7-10% IoU (if done correctly)
 **Difficulty:** Medium
-**Status:** V7 failed, needs V7.1 with correct LSTM implementation
+**Status:** Implemented in V7.5
+**Result:** 0.092 IoU
 
 ---
 
-### 2.3 Multi-Scale Feature Extraction
-**Problem:** Limited receptive field (7x7 in V3), can't see distant terrain/wind
-
-**Solution A - Dilated Convolutions:**
-```python
-# Add dilated convs to capture multi-scale context
-nn.Conv2d(64, 128, kernel_size=3, dilation=1)  # 3x3
-nn.Conv2d(128, 128, kernel_size=3, dilation=2)  # 5x5 effective
-nn.Conv2d(128, 128, kernel_size=3, dilation=4)  # 9x9 effective
-```
-
-**Solution B - Feature Pyramid Network:**
-- Process features at multiple scales (1x, 1/2x, 1/4x)
-- Fuse multi-scale information
-- Capture both local spread and global wind patterns
-
-**Expected Gain:** +4-6% IoU
-**Difficulty:** Medium
-**Status:** -
-
----
-
-### 2.4 Channel Attention (Squeeze-and-Excitation)
+### 2.4 Channel Attention 
 **Problem:** All 128 feature channels weighted equally
 
 **Solution:**
@@ -221,11 +133,10 @@ class ChannelAttention(nn.Module):
 
 **Expected Gain:** +3-5% IoU
 **Difficulty:** Easy
-**Status:** Can add to V7
-
+**Status:** Can be implemented in V8.5 
 ---
 
-## Phase 3: Advanced Training Strategies (Target: 60-65% IoU, 2-3 weeks)
+## Phase 3: Advanced Training Strategies
 
 ### 3.1 Curriculum Learning
 **Problem:** Training on mixed difficulty episodes leads to unstable learning
@@ -242,7 +153,7 @@ class ChannelAttention(nn.Module):
 
 **Expected Gain:** +4-6% IoU
 **Difficulty:** Medium
-**Status:** Planned for Phase 3
+**Status:** Planned for Phase 3 (P1, needs to be separated from V1~V8)
 
 ---
 
@@ -269,7 +180,7 @@ def compute_priority(episode_iou, episode_age, episode_diversity):
 
 **Expected Gain:** +3-4% IoU
 **Difficulty:** Medium
-**Status:** Planned for Phase 3
+**Status:** Planned for Phase 3 (P2)
 
 ---
 
@@ -293,7 +204,7 @@ def compute_reward(pred_mask, actual_mask, fire_front_mask):
 
 **Expected Gain:** +2-4% IoU
 **Difficulty:** Medium
-**Status:** Planned for Phase 3
+**Status:** Separate from model architecture, can be implemented in V1~V8, P1~
 
 ---
 
@@ -326,7 +237,7 @@ scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
 
 ---
 
-### 3.5 Ensemble Methods ⭐ HIGH IMPACT
+### 3.5 Ensemble Methods HIGH IMPACT
 **Strategy:** Train 5 models with different random seeds
 
 **Ensemble Approaches:**
@@ -353,7 +264,7 @@ ensemble_prob = sum(w * p for w, p in zip(weights, model_probs))
 
 **Expected Gain:** +5-8% IoU (reliable improvement)
 **Difficulty:** Easy (just train 5x)
-**Status:** Planned for Phase 3
+**Status:** To be implemented in P3
 
 ---
 
@@ -386,82 +297,6 @@ class FireSpreadGNN(nn.Module):
 
 **Expected Gain:** +5-10% IoU (research direction)
 **Difficulty:** Hard (new paradigm)
-**Status:** Research exploration
-
----
-
-### 4.2 Transformer Architecture
-**Problem:** Convolutions have limited receptive field, can't model long-range dependencies
-
-**Vision Transformer for Wildfire:**
-```python
-class FireSpreadTransformer(nn.Module):
-    def __init__(self):
-        self.patch_embed = PatchEmbedding(patch_size=4, in_channels=14, embed_dim=256)
-        self.transformer = nn.TransformerEncoder(
-            nn.TransformerEncoderLayer(d_model=256, nhead=8),
-            num_layers=6
-        )
-        self.spread_head = nn.Linear(256, 1)
-```
-
-**Benefits:**
-- Global attention (see entire fire + terrain)
-- Capture long-range wind effects
-- State-of-the-art in vision tasks
-
-**Challenges:**
-- Computationally expensive (O(n²) for n patches)
-- Requires more data
-- Harder to train
-
-**Expected Gain:** +5-8% IoU (uncertain)
-**Difficulty:** Hard
-**Status:** Research exploration
-
----
-
-### 4.3 Hybrid CNN-Transformer
-**Best of Both Worlds:**
-- CNN encoder for local features (fire spread patterns)
-- Transformer for global context (wind, distant terrain)
-
-**Architecture:**
-```python
-class HybridModel(nn.Module):
-    def __init__(self):
-        self.cnn_encoder = CNNEncoder()  # Local features
-        self.transformer = TransformerEncoder()  # Global context
-        self.fusion = CrossAttention()  # Combine local + global
-        self.policy_head = PolicyHead()
-```
-
-**Expected Gain:** +6-10% IoU
-**Difficulty:** Hard
-**Status:** Research exploration
-
----
-
-### 4.4 Model-Based RL (World Model)
-**Problem:** Model-free A3C doesn't plan ahead
-
-**Solution:**
-1. Learn world model: `M(s_t, a_t) → s_{t+1}`
-2. Use model for planning (look ahead 3-5 steps)
-3. Combine model-based planning with model-free policy
-
-**Benefits:**
-- Better long-term decisions
-- Sample efficiency
-- Can simulate "what-if" scenarios
-
-**Challenges:**
-- World model must be accurate
-- Complex training (two models)
-- Computationally expensive
-
-**Expected Gain:** +8-12% IoU (high variance)
-**Difficulty:** Very Hard
 **Status:** Research exploration
 
 ---
@@ -513,49 +348,6 @@ def episode_quality_score(episode):
 
 ---
 
-### 5.3 Fire Front Prediction (Alternative Formulation)
-**Current:** Predict 8-neighbors for ALL burning cells
-
-**Proposed:** Predict only for fire front (active spread zone)
-
-**Definition of Fire Front:**
-- Cells that are burning at time t
-- AND have at least one non-burning neighbor
-- These are the cells where spread will happen
-
-**Benefits:**
-- Smaller action space (10-30 cells instead of 50-100)
-- Focus on active spread region
-- Ignore stable interior fire
-
-**Expected Gain:** +3-6% IoU (clearer credit assignment)
-**Difficulty:** Medium
-**Status:** Planned for testing
-
----
-
-### 5.4 Hierarchical Action Space
-**Problem:** Predicting 8 independent Bernoulli variables is hard
-
-**Proposed:** Two-level hierarchy
-
-**Level 1 - Sector Prediction:**
-- Predict which of 8 sectors will have spread (binary, 8 dimensions)
-- Sectors: N, NE, E, SE, S, SW, W, NW
-
-**Level 2 - Intensity Prediction:**
-- For sectors predicted to have spread, predict burn probability (continuous)
-
-**Benefits:**
-- Easier exploration (decomposed problem)
-- Can learn sector patterns first, then fine-tune intensity
-
-**Expected Gain:** +2-4% IoU
-**Difficulty:** Medium
-**Status:** Research idea
-
----
-
 ## Phase 6: Evaluation & Analysis (Ongoing)
 
 ### 6.1 Comprehensive Validation Evaluation
@@ -577,7 +369,7 @@ metrics = {
 }
 ```
 
-**Status:** ✅ Tools available (`evaluate.py`), need to run
+**Status:** Tools available (`evaluate.py`), need to run
 
 ---
 
@@ -618,47 +410,23 @@ def visualize_prediction(env, model, timestep):
 
 ---
 
-### 6.4 Ablation Studies
-**Questions:**
-- How much does each feature contribute? (weather vs terrain vs fire history)
-- Which architectural components matter? (depth, width, attention)
-- What's the impact of each augmentation type?
-
-**Systematic Testing:**
-```
-Baseline: V3 without augmentation
-+ Rotation augmentation: +X% IoU
-+ Flip augmentation: +Y% IoU
-+ Experience replay: +Z% IoU
-+ Rotation + Flip + Replay: +W% IoU (check for synergy)
-```
-
-**Status:** Not yet done
-
----
-
 ## Implementation Roadmap
 
-### ✅ Completed
+### Completed
 - V1-V2: Initial formulation (failed)
-- V3: Per-cell 8-neighbor formulation (40.91% IoU) ✅
-- V4: Worker count optimization (4 workers optimal) ✅
-- V5: 4-neighbor multi-task (failed - 12% F1) ❌
-- V6: Data augmentation + replay (36.36% IoU) ✅
-- Episode quality filtering (min-len 2→3→4) ✅
+- V3: Per-cell 8-neighbor formulation (40.91% IoU)
+- V3.5: Per-pixel LSTM context (12.76% IoU) 
+- V4: Worker count optimization (4 workers optimal)(40.1% IoU)
+- V5: 4-neighbor multi-task (failed - 12% F1)
+- V6: Data augmentation + replay (36.36% IoU)
+- V7: 3D Conv temporal (8.13% IoU)
+- V7.5 : Temporal context with LSTM (9.2% IoU)
+- Episode quality filtering (min-len 2→3→4)
 
-### ❌ Failed Attempts
-- V7 (3D Conv temporal): 8.13% IoU, -80% degradation
-  - Mistake: Used 3D conv instead of LSTM
-  - Mistake: Reduced encoder capacity (64 vs 128 channels)
-  - Lesson: Temporal modeling needs recurrent state
+### Next Up 
+- **V8:** Spatial(+Channel) attention mechanism
 
-### 📋 Next Up (V7.1 or V8)
-- Temporal context with LSTM (not 3D conv!)
-- Spatial attention mechanism
-- Channel attention
-
-### 🔮 Future (V8+)
+### Learning + Training Methods
 - Multi-scale features
 - Curriculum learning
 - Ensemble methods
@@ -666,70 +434,22 @@ Baseline: V3 without augmentation
 
 ---
 
-## Expected Performance Trajectory
-
-| Phase | Models | Key Features | Target IoU | Result |
-|-------|--------|--------------|------------|--------|
-| ✅ Completed | V3 | 8-neighbor, episode filtering | 40.91% | ✅ Done |
-| ❌ Failed | V5 | 4-neighbor multi-task | 50-60% | ❌ 12% F1 |
-| ✅ Phase 1 | V6 | V3 + augmentation + replay | 45-50% | ✅ 36.36% (modest gain) |
-| ❌ Failed | V7 | 3D Conv temporal (wrong!) | 47-50% | ❌ 8.13% (-80%!) |
-| Phase 2 | V7.5/V8 | LSTM temporal (correct) | 50-55% | Planned |
-| Phase 3 | V8+ | Attention + curriculum + ensemble | 60-65% | Future |
-| Phase 4 | V9+ | Advanced architectures | 65-70% | Future |
-
----
-
-## Risk Assessment
-
-### Low Risk, High Reward (Do First) ⭐
-1. Data augmentation
-2. Experience replay
-3. Ensemble methods
-4. Learning rate tuning
-
-### Medium Risk, High Reward (Do Next)
-1. Spatial attention
-2. Temporal LSTM
-3. Multi-scale features
-4. Curriculum learning
-
-### High Risk, High Reward (Research)
-1. GNN architecture
-2. Transformer architecture
-3. Model-based RL
-4. Synthetic data generation
-
-### Low Reward (Skip for Now)
-1. Micro-optimizations (optimizer choice, etc.)
-2. Over-complicated reward shaping
-3. Excessive hyperparameter tuning
-
----
-
-## Key Principles
+## What we've learned so far
 
 1. **Episode Quality > Quantity:** 502 good episodes beats 5036 mixed episodes
-2. **Temporal Context is Critical:** Fire spread is inherently sequential
-3. **Use Correct Architecture:** LSTM/GRU for temporal (NOT 3D conv) - V7 proved this
-4. **Don't Sacrifice Capacity:** Keep full encoder (128 channels), performance > efficiency
-5. **Attention Helps:** Fire front is sparse, attention can focus computation
-6. **Augmentation is Free Performance:** Rotation/flip invariance is guaranteed
-7. **Ensemble When Unsure:** 5 models always beats 1 model
-8. **Validate Frequently:** Don't overtrain on training set
-9. **Understand Failures:** Analyze where model fails, design targeted fixes (V7 taught us this)
+2. **Don't Sacrifice Capacity:** Keep full encoder (128 channels), performance > efficiency
+3. **Validate Frequently:** Don't overtrain on training set
 
 ---
 
 ## References & Inspiration
 
-- **MCTS-A3C:** 87% baseline (Saskatchewan dataset)
+- **MCTS-A3C:** 87% baseline (Saskatchewan simulation dataset)
 - **U-Net Baseline:** 19.85% F1 (~11% IoU) - supervised learning ceiling
 - **V3 Breakthrough:** 40.91% IoU - correct problem formulation matters
 - **Worker Count Discovery:** 4 workers optimal (not 2 or 8)
 
 ---
 
-**Last Updated:** 2025-11-16 (V7 Postmortem)
-**Current Focus:** Learning from V7 failure, planning V7.5 with correct LSTM
+**Last Updated:** 2025-11-21 (Post re-embed and re-tile)
 **Target:** 70% IoU for production deployment
