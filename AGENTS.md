@@ -17,7 +17,7 @@ This project is a wildfire spread prediction algorithm implemented by reinforcem
 ## Development environment
 
 - OS : Ubuntu 24.04.3 LTS
-- IDE : Neovim
+- IDE : Neovim (Or PyCharm)
 - Env : Terminal (zsh, tmux) 
 
 ## Location
@@ -32,6 +32,8 @@ This project is a wildfire spread prediction algorithm implemented by reinforcem
 - Whenever something failes, look up official documentation for reference 
 - Never run the full training, always give the user the command or guide to run full training
 - When the user don't specify wandb integration, the default is yes
+- Attach this file(AGENTS.md) context eveytime you act(plan, create a response, test, etc), to enforce the rules more effectively
+- Always ask questions to the user to clarify every aspect of the act
 
 ## Code Styles
 
@@ -43,4 +45,3 @@ This project is a wildfire spread prediction algorithm implemented by reinforcem
 ## Workflow
 
 - Plan -> Implement -> Test -> Debug -> Evaluate
-
