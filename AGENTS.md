@@ -34,6 +34,7 @@ This project is a wildfire spread prediction algorithm implemented by reinforcem
 - When the user don't specify wandb integration, the default is yes
 - Attach this file(AGENTS.md) context eveytime you act(plan, create a response, test, etc), to enforce the rules more effectively
 - Always ask questions to the user to clarify every aspect of the act
+- Never use emojis (or non-ascii characters)
 
 ## Code Styles
 
