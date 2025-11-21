@@ -37,6 +37,7 @@ This project is a wildfire spread prediction algorithm implemented by reinforcem
 
 - Concise and readable (Extensive and descriptive code comments)
 - Use reusable patterns if applicable
+- Specify lots of default arguments which are proven to be effective before (i.e. minimum-episode-length 4, num-workers 4, lr, gamma, etc)
 
 ## Workflow
 
