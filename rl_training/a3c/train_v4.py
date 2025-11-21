@@ -137,7 +137,7 @@ def main():
     print(f"=" * 80)
     print(f"A3C V4 Training - Medium Capacity Architecture")
     print(f"=" * 80)
-    print(f"Model: 3-layer encoder (14→48→96→192) + GroupNorm")
+    print(f"Model: 3-layer encoder (15→48→96→192) + GroupNorm")
     print(f"Params: 935K (2.24x increase from V2, CPU-friendly)")
     print(f"Problem: Per-cell 8-neighbor prediction")
     print(f"Rewards: DENSE (IoU at every timestep)")
@@ -199,14 +199,14 @@ def main():
         print("WandB logging disabled")
 
     # Create shared model on CPU (V4 Medium: 3 layers with increased channels + GroupNorm)
-    shared_model = A3C_PerCellModel_Medium(in_channels=14, use_groupnorm=True)
+    shared_model = A3C_PerCellModel_Medium(in_channels=15, use_groupnorm=True)
     shared_model.share_memory()
     shared_model.train()
 
     # Count parameters
     total_params = sum(p.numel() for p in shared_model.parameters())
     print(f"Model parameters: {total_params:,}")
-    print(f"Architecture: 3-layer encoder (14→48→96→192) with GroupNorm")
+    print(f"Architecture: 3-layer encoder (15→48→96→192) with GroupNorm")
 
     # Create timestamped checkpoint directory
     from datetime import datetime

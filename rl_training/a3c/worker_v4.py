@@ -55,7 +55,7 @@ def worker_process_correct(worker_id, shared_model, optimizer, filtered_episodes
     np.random.seed(config['seed'] + worker_id)
 
     # Create local model (V4 Medium: 3 layers with increased channels + GroupNorm)
-    local_model = A3C_PerCellModel_Medium(in_channels=14, use_groupnorm=True)
+    local_model = A3C_PerCellModel_Medium(in_channels=15, use_groupnorm=True)
     local_model.train()
 
     episode_count = 0
