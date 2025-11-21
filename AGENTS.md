@@ -31,6 +31,7 @@ This project is a wildfire spread prediction algorithm implemented by reinforcem
 - Take into account of hardware restrictions, calculate whether the model fits inside memory during training 
 - Whenever something failes, look up official documentation for reference 
 - Never run the full training, always give the user the command or guide to run full training
+- When the user don't specify wandb integration, the default is yes
 
 ## Code Styles
 
