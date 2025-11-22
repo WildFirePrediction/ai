@@ -65,7 +65,8 @@ class SpatialAttention(nn.Module):
 
 **Expected Gain:** +5-8% IoU
 **Difficulty:** Medium
-**Status:** Planned for V8
+**Status:** Implemented in V8
+**Result:** 0.5601 IoU
 
 ---
 

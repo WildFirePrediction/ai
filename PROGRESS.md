@@ -38,6 +38,7 @@
 
 > **V3** --mel 4, --num-workers 4 : **0.3182** (@episode 1416)
 
+> **V8** --mel 4, --num-workers 4 : **0.05610** 
 ---
 
 # RL
