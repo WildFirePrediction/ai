@@ -1,0 +1,19 @@
+{
+  "num_episodes": 593,
+  "split": "val",
+  "min_episode_length": 4,
+  "checkpoint": "rl_training/a3c/checkpoints_v3/mel4-workers4-ep1k(0.4091)/best_model.pt",
+  "overall_mean_iou": 0.0002821429951696608,
+  "overall_median_iou": 0.0,
+  "overall_std_iou": 0.0018860642407245354,
+  "overall_max_iou": 0.25,
+  "overall_min_iou": 0.0,
+  "overall_mean_precision": 0.004851472306620873,
+  "overall_mean_recall": 0.0002855614234604611,
+  "overall_mean_f1": 0.0005167087724616379,
+  "iou_percentile_25": 0.0,
+  "iou_percentile_50": 0.0,
+  "iou_percentile_75": 0.0,
+  "iou_percentile_90": 0.0,
+  "iou_percentile_95": 0.0
+}

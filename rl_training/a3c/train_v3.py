@@ -205,7 +205,7 @@ def main():
     # Create timestamped checkpoint directory
     from datetime import datetime
     timestamp = datetime.now().strftime("%y%m%d-%H%M")
-    ckpt_dir = repo_root / 'rl_training' / 'a3c' / 'checkpoints_v3' / timestamp
+    ckpt_dir = repo_root / 'rl_training' / 'a3c' / 're_checkpoints_v3' / timestamp
     ckpt_dir.mkdir(exist_ok=True, parents=True)
     print(f"Checkpoint directory: {ckpt_dir}")
 
