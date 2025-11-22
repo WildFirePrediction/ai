@@ -1,0 +1,20 @@
+{
+  "num_episodes": 593,
+  "split": "val",
+  "min_episode_length": 4,
+  "checkpoint": "rl_training/a3c/checkpoints_v3/REEMBEDv3/best_model.pt",
+  "channels": 15,
+  "overall_mean_iou": 0.0015538982407571264,
+  "overall_median_iou": 0.0,
+  "overall_std_iou": 0.00504688175454722,
+  "overall_max_iou": 0.5,
+  "overall_min_iou": 0.0,
+  "overall_mean_precision": 0.014065264208132488,
+  "overall_mean_recall": 0.0018039071860220673,
+  "overall_mean_f1": 0.0027296300249453256,
+  "iou_percentile_25": 0.0,
+  "iou_percentile_50": 0.0,
+  "iou_percentile_75": 0.0,
+  "iou_percentile_90": 0.00552882128173397,
+  "iou_percentile_95": 0.007865498485890299
+}
