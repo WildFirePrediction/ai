@@ -1,0 +1,22 @@
+{
+  "fire_id": "421274",
+  "fire_location": {
+    "lat": 35.56438201063662,
+    "lon": 129.4087412291838
+  },
+  "spread_points": [
+    {
+      "lat": 35.56438201063662,
+      "lon": 129.40514122918378
+    },
+    {
+      "lat": 35.56078201063662,
+      "lon": 129.4087412291838
+    }
+  ],
+  "total_initial_cells": 3,
+  "fire_timestamp": "2025-11-30T16:23:41",
+  "inference_timestamp": "2025-11-30T16:23:43.794113",
+  "model": "a3c_16ch_v3_lstm_rel",
+  "predictions": []
+}

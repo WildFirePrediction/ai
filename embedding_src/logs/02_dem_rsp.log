@@ -1,0 +1,51 @@
+================================================================================
+DEM & RSP EMBEDDING
+================================================================================
+
+[1/5] Loading DEM data...
+DEM loaded successfully
+Shape: (12720, 8013)
+CRS: PROJCS["Transverse Mercator",GEOGCS["GRS80 ELLIPSOID",DATUM["GRS80 ELLIPSOID",SPHEROID["GRS 1980",6378137,298.257222101004],TOWGS84[0,0,0,0,0,0,0]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]]],PROJECTION["Transverse_Mercator"],PARAMETER["latitude_of_origin",38.0000000000001],PARAMETER["central_meridian",127],PARAMETER["scale_factor",1],PARAMETER["false_easting",200000],PARAMETER["false_northing",600000],UNIT["metre",1,AUTHORITY["EPSG","9001"]],AXIS["Easting",EAST],AXIS["Northing",NORTH]]
+Bounds: BoundingBox(left=-64424.0, bottom=36953.0, right=656746.0, top=1181753.0)
+Elevation range: [-9999.00, 2650.68] m
+
+[2/5] Normalizing DEM...
+DEM normalized to range: [0.0000, 1.0000]
+Valid pixels: 98,741,898 / 101,925,360
+
+[3/5] Loading RSP data...
+Found RSP file: Relative Slope Position_gw.tif
+RSP loaded successfully
+Shape: (5852, 6699)
+RSP range: [-99999.0000, 1.8486]
+
+[4/5] Aligning to 400m grid (EPSG:5179)...
+
+⚠️  CLIPPING TO SOUTH KOREA BOUNDS ONLY
+  X: 670,800 to 1,346,800 (676.0 km)
+  Y: 1,395,200 to 2,118,800 (723.6 km)
+  (Excludes North Korea - DMZ is at Y ≈ 1,450,000)
+
+DEM CRS (PROJCS["Transverse Mercator",GEOGCS["GRS80 ELLIPSOID",DATUM["GRS80 ELLIPSOID",SPHEROID["GRS 1980",6378137,298.257222101004],TOWGS84[0,0,0,0,0,0,0]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]]],PROJECTION["Transverse_Mercator"],PARAMETER["latitude_of_origin",38.0000000000001],PARAMETER["central_meridian",127],PARAMETER["scale_factor",1],PARAMETER["false_easting",200000],PARAMETER["false_northing",600000],UNIT["metre",1,AUTHORITY["EPSG","9001"]],AXIS["Easting",EAST],AXIS["Northing",NORTH]]) differs from target CRS (EPSG:5179)
+Calculating transformed bounds...
+Full DEM bounds (EPSG:5179): W=688889.78, S=1435122.63, E=1415864.21, N=2583222.69
+Clipped bounds (South Korea): W=688889.78, S=1435122.63, E=1346800.00, N=2118800.00
+Target grid:
+  Origin: (688800.00, 1434800.00)
+  Dimensions: 1645 x 1710
+  Resolution: 400m
+DEM reprojected: (1710, 1645), range [0.0000, 0.6956]
+RSP reprojected: (1710, 1645), range [0.0000, 0.9913]
+  NaN pixels: 2707978
+
+[5/5] Saving embedded data...
+Saved embedded data to: ../embedded_data/dem_rsp_embedded.tif
+File size: 5.05 MB
+Saved normalization stats to: ../embedded_data/dem_rsp_norm_stats.json
+
+================================================================================
+DEM & RSP EMBEDDING COMPLETE
+================================================================================
+✓ Grid: 1645 x 1710 @ 400m resolution
+✓ CRS: EPSG:5179
+✓ Ready for next stage

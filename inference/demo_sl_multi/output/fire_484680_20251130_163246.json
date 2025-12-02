@@ -1,0 +1,38 @@
+{
+  "fire_id": "484680",
+  "fire_location": {
+    "lat": 36.27545605333026,
+    "lon": 129.53428923950412
+  },
+  "spread_points": [
+    {
+      "lat": 36.27185605333026,
+      "lon": 129.53788923950412
+    },
+    {
+      "lat": 36.27905605333026,
+      "lon": 129.53428923950412
+    }
+  ],
+  "total_initial_cells": 2,
+  "fire_timestamp": "2025-11-30T16:32:46",
+  "inference_timestamp": "2025-11-30T16:32:48.296842",
+  "model": "unet_16ch_v3",
+  "predictions": [
+    {
+      "timestep": 1,
+      "timestamp": "2025-11-30T17:32:46",
+      "predicted_cells": []
+    },
+    {
+      "timestep": 2,
+      "timestamp": "2025-11-30T18:32:46",
+      "predicted_cells": []
+    },
+    {
+      "timestep": 3,
+      "timestamp": "2025-11-30T19:32:46",
+      "predicted_cells": []
+    }
+  ]
+}

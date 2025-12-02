@@ -1,0 +1,16 @@
+data/
+embedded_data/
+tilling_data/
+rl_training/
+sl_training/
+wandb/
+.DS_Store/
+.idea/
+.claude/
+.venv/
+._*
+.wandbignore
+__pycache__/
+*.pyc
+AGENTS.md
+PROGRESS.md

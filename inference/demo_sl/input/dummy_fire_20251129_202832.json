@@ -1,0 +1,25 @@
+{
+  "fireShowInfoList": [
+    {
+      "frfrLctnXcrd": "128.15914223752497",
+      "frfrLctnYcrd": "36.380771094217785",
+      "frfrFrngDtm": "2025-11-29 20:28:32",
+      "frfrInfoId": "457265",
+      "frfrPrgrsStcd": "01",
+      "frfrPrgrsStcdNm": "진행중",
+      "frfrOccrrTpcd": "05",
+      "frfrStepIssuCd": "00",
+      "frfrStepIssuNm": "초기 대응",
+      "frfrPotfrRt": 100,
+      "frfrSttmnDt": "20251129",
+      "frfrSttmnHms": "202832",
+      "frfrOccrrStcd": "31",
+      "frfrSttmnLctnXcrd": "128.15914223752497",
+      "frfrSttmnLctnYcrd": "36.380771094217785",
+      "frfrSttmnAddr": "경상북도 Gumi (위도: 36.3808, 경도: 128.1591)",
+      "frfrSttmnAddrDe": "경상북도 Gumi 산림지역",
+      "potfrCmpleDtm": "2025-11-29 20:28:32",
+      "lgdngCd": "6454379"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+[Unit]
+Description=Wildfire KFS Monitor
+After=network.target wildfire-api.service
+Requires=wildfire-api.service
+
+[Service]
+Type=simple
+User=chaseungjoon
+Group=chaseungjoon
+WorkingDirectory=/home/chaseungjoon/code/WildfirePrediction
+Environment="PATH=/home/chaseungjoon/code/WildfirePrediction/.venv/bin"
+ExecStart=/home/chaseungjoon/code/WildfirePrediction/.venv/bin/python inference/fire_monitor/kfs_monitor.py --poll-interval 120
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

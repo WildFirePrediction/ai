@@ -1,0 +1,97 @@
+================================================================================
+NASA VIIRS FIRE DATA EMBEDDING
+================================================================================
+
+[1/8] Loading pre-clustered fire data...
+Found 14 clustered fire archive files
+  - DL_FIRE_20120201-20130201/clustered_fire_archive_SV-C2_663166.csv
+  - DL_FIRE_20130201-20140201/clustered_fire_archive_SV-C2_663167.csv
+  - DL_FIRE_20140201-20150201/clustered_fire_archive_SV-C2_663168.csv
+Loading CSV files:   0%|          | 0/14 [00:00<?, ?it/s]Loading CSV files: 100%|██████████| 14/14 [00:00<00:00, 205.10it/s]
+/home/chaseungjoon/code/WildfirePrediction/embedding_src/01_nasa_viirs_embedding.py:163: FutureWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass `include_groups=False` to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.
+  df_filtered = df_filtered.groupby('episode_id', group_keys=False).apply(
+
+Total records: 115,799
+Pre-defined clusters: 130
+
+Columns: ['LATITUDE', 'LONGITUDE', 'BRIGHTNESS', 'SCAN', 'TRACK', 'ACQ_DATE', 'ACQ_TIME', 'SATELLITE', 'INSTRUMENT', 'CONFIDENCE', 'VERSION', 'BRIGHT_T31', 'FRP', 'DAYNIGHT', 'TYPE', 'geometry', 'CLUSTER_ID']
+
+[2/8] Filtering low confidence observations...
+Before filtering: 115,799 records
+Confidence distribution:
+CONFIDENCE
+n    115339
+h       460
+Name: count, dtype: int64
+
+After filtering: 115,799 records
+Removed 0 low confidence records
+
+[3/8] Transforming coordinates to EPSG:5179...
+Coordinate transformation completed
+X range: [750099.59, 1300795.82] meters
+Y range: [1469218.95, 2068773.79] meters
+
+[4/8] Processing temperature feature...
+Temperature statistics:
+count    115799.000000
+mean         11.426905
+std           8.722528
+min         -27.610000
+25%           5.220000
+50%          11.630000
+75%          17.190000
+max          86.280000
+Name: te, dtype: float64
+
+[5/8] Processing fire intensity feature...
+Fire Intensity statistics:
+                 FRP          i_raw              i
+count  115799.000000  115799.000000  115799.000000
+mean        2.543654       6.397097       1.888838
+std         6.312503       6.950054       0.401306
+min         0.090000       2.345000       1.207467
+25%         1.090000       3.976000       1.604626
+50%         1.620000       5.048000       1.799728
+75%         2.540000       7.161000       2.099367
+max       601.700000     611.085000       6.416871
+
+[6/8] Processing temporal features using pre-clustered episodes...
+Total fire episodes (from clustering): 130
+Time elapsed (tm) statistics:
+count    115799.000000
+mean      58282.144161
+std       34135.946366
+min           0.000000
+25%       28512.516667
+50%       58162.850000
+75%       87293.791667
+max      117551.800000
+Name: tm, dtype: float64
+
+Episode statistics:
+  Mean duration: 91021.83 hours
+  Mean detections per episode: 890.8
+  Episodes with >10 detections: 121
+
+[7/8] Normalizing features...
+Normalization statistics:
+  x_norm: mean=-0.000000, std=1.000000
+  y_norm: mean=0.000000, std=1.000000
+  te_norm: mean=0.000000, std=1.000000
+  i_norm: mean=-0.000000, std=1.000000
+  tm_norm: mean=-0.000000, std=1.000000
+
+[8/8] Saving embedded data...
+Saved embedded data to: ../embedded_data/nasa_viirs_embedded.parquet
+Shape: (115799, 18)
+File size: 8.24 MB
+Saved normalization stats to: ../embedded_data/nasa_viirs_norm_stats.json
+Saved episode index to: ../embedded_data/nasa_viirs_episode_index.parquet
+
+================================================================================
+NASA VIIRS EMBEDDING COMPLETE
+================================================================================
+✓ Processed 115,799 fire detections
+✓ Identified 130 fire episodes
+✓ Ready for RL training

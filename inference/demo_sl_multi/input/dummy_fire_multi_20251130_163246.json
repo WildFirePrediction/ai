@@ -1,0 +1,35 @@
+{
+  "fireShowInfoList": [
+    {
+      "frfrLctnXcrd": "129.53428923950412",
+      "frfrLctnYcrd": "36.27545605333026",
+      "frfrFrngDtm": "2025-11-30 16:32:46",
+      "frfrInfoId": "484680",
+      "frfrPrgrsStcd": "01",
+      "frfrPrgrsStcdNm": "진행중",
+      "frfrOccrrTpcd": "05",
+      "frfrStepIssuCd": "00",
+      "frfrStepIssuNm": "초기 대응",
+      "frfrPotfrRt": 100,
+      "frfrSttmnDt": "20251130",
+      "frfrSttmnHms": "163246",
+      "frfrOccrrStcd": "31",
+      "frfrSttmnLctnXcrd": "129.53428923950412",
+      "frfrSttmnLctnYcrd": "36.27545605333026",
+      "frfrSttmnAddr": "경상북도 Pohang (위도: 36.2755, 경도: 129.5343)",
+      "frfrSttmnAddrDe": "경상북도 Pohang 산림지역",
+      "potfrCmpleDtm": "2025-11-30 16:32:46",
+      "lgdngCd": "4833627",
+      "spread_points": [
+        {
+          "lat": 36.27185605333026,
+          "lon": 129.53788923950412
+        },
+        {
+          "lat": 36.27905605333026,
+          "lon": 129.53428923950412
+        }
+      ]
+    }
+  ]
+}

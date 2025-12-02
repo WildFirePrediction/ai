@@ -1,0 +1,25 @@
+{
+  "fireShowInfoList": [
+    {
+      "frfrLctnXcrd": "128.18310787167255",
+      "frfrLctnYcrd": "36.3571801257765",
+      "frfrFrngDtm": "2025-11-29 19:59:38",
+      "frfrInfoId": "454116",
+      "frfrPrgrsStcd": "01",
+      "frfrPrgrsStcdNm": "진행중",
+      "frfrOccrrTpcd": "05",
+      "frfrStepIssuCd": "00",
+      "frfrStepIssuNm": "초기 대응",
+      "frfrPotfrRt": 100,
+      "frfrSttmnDt": "20251129",
+      "frfrSttmnHms": "195938",
+      "frfrOccrrStcd": "31",
+      "frfrSttmnLctnXcrd": "128.18310787167255",
+      "frfrSttmnLctnYcrd": "36.3571801257765",
+      "frfrSttmnAddr": "테스트 지역 (위도: 36.3572, 경도: 128.1831)",
+      "frfrSttmnAddrDe": "테스트 주소 상세",
+      "potfrCmpleDtm": "2025-11-29 19:59:38",
+      "lgdngCd": "4126072"
+    }
+  ]
+}

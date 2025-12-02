@@ -1,0 +1,27 @@
+# dot files
+.DS_Store
+.idea
+.claude
+.venv
+._*
+.wandbignore
+
+# directories
+data
+embedded_data
+tilling_data
+rl_training/supervised/checkpoints_unet/best_model
+wandb
+rl_training
+sl_training
+
+
+# files
+*.html
+__pycache__
+*.pyc
+sl_training/**/*.pt
+
+# Project documentation (local only)
+AGENTS.md
+PROGRESS.md

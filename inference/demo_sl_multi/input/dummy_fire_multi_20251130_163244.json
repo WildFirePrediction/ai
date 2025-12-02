@@ -1,0 +1,35 @@
+{
+  "fireShowInfoList": [
+    {
+      "frfrLctnXcrd": "129.14802778859234",
+      "frfrLctnYcrd": "37.201103768531496",
+      "frfrFrngDtm": "2025-11-30 16:32:44",
+      "frfrInfoId": "487249",
+      "frfrPrgrsStcd": "01",
+      "frfrPrgrsStcdNm": "진행중",
+      "frfrOccrrTpcd": "05",
+      "frfrStepIssuCd": "00",
+      "frfrStepIssuNm": "초기 대응",
+      "frfrPotfrRt": 100,
+      "frfrSttmnDt": "20251130",
+      "frfrSttmnHms": "163244",
+      "frfrOccrrStcd": "31",
+      "frfrSttmnLctnXcrd": "129.14802778859234",
+      "frfrSttmnLctnYcrd": "37.201103768531496",
+      "frfrSttmnAddr": "경상북도 Uljin (위도: 37.2011, 경도: 129.1480)",
+      "frfrSttmnAddrDe": "경상북도 Uljin 산림지역",
+      "potfrCmpleDtm": "2025-11-30 16:32:44",
+      "lgdngCd": "1159581",
+      "spread_points": [
+        {
+          "lat": 37.1975037685315,
+          "lon": 129.14442778859234
+        },
+        {
+          "lat": 37.201103768531496,
+          "lon": 129.14442778859234
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "fire_id": "411463",
+  "fire_location": {
+    "lat": 37.13936723976221,
+    "lon": 129.49576120919374
+  },
+  "fire_timestamp": "2025-11-29T20:29:57",
+  "inference_timestamp": "2025-11-29T20:29:59.180770",
+  "model": "unet_16ch_v3",
+  "predictions": [
+    {
+      "timestep": 1,
+      "timestamp": "2025-11-29T21:29:57",
+      "predicted_cells": []
+    },
+    {
+      "timestep": 2,
+      "timestamp": "2025-11-29T22:29:57",
+      "predicted_cells": []
+    },
+    {
+      "timestep": 3,
+      "timestamp": "2025-11-29T23:29:57",
+      "predicted_cells": []
+    }
+  ]
+}

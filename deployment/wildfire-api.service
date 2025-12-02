@@ -1,0 +1,16 @@
+[Unit]
+Description=Wildfire Inference API Server
+After=network.target
+
+[Service]
+Type=simple
+User=chaseungjoon
+Group=chaseungjoon
+WorkingDirectory=/home/chaseungjoon/code/WildfirePrediction
+Environment="PATH=/home/chaseungjoon/code/WildfirePrediction/.venv/bin"
+ExecStart=/home/chaseungjoon/code/WildfirePrediction/.venv/bin/gunicorn -w 1 -b 0.0.0.0:5000 --timeout 120 inference.rl.api_server:app
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,62 @@
+================================================================================
+KMA WEATHER DATA EMBEDDING
+================================================================================
+
+[1/6] Loading grid configuration...
+Grid configuration loaded
+  Origin: (688800.00, 1434800.00)
+  Dimensions: 1645 x 1710
+  Tile size: 400m
+
+[2/6] Loading KMA weather data...
+Found 13326 KMA AWS data files
+Loading: ../data/KMA/201603041753/AWS_201603041753.csv
+Loaded 697 station records
+Columns: ['TIME', 'STN', 'WD1', 'WS1', 'WDS', 'WSS', 'WD10', 'WS10', 'TA', 'RE', 'RN-15m', 'RN-60m', 'RN-12H', 'RN-DAY', 'HM', 'PA', 'PS', 'TD']
+
+Data sample:
+   station_id  wind_speed  wind_dir  temp  humid  precip_60
+0          90         3.6     352.3   4.5   82.1        0.0
+1          92         2.5     346.0   4.9   89.0        0.0
+2          95         0.7     232.6  16.6   29.3        0.0
+3          96         1.7     135.6  10.4   91.1        0.0
+4          98         2.7     170.6  17.4   37.7        0.0
+
+[3/6] Loading station locations...
+  WARNING: 624 stations not found in coordinate database:
+    Missing IDs: [np.int64(96), np.int64(102), np.int64(104), np.int64(105), np.int64(106), np.int64(110), np.int64(113), np.int64(116), np.int64(151), np.int64(160), np.int64(163), np.int64(167), np.int64(169), np.int64(172), np.int64(174), np.int64(175), np.int64(177), np.int64(182), np.int64(188), np.int64(229)]
+  These stations will be excluded from interpolation
+  Loaded coordinates for 73 stations
+  Coordinate range: lat [33.29, 38.21], lon [126.30, 129.43]
+Coordinates transformed to EPSG:5179
+
+[4/6] Decomposing wind direction...
+Wind direction decomposed to (d_x, d_y) components
+
+[5/6] Interpolating weather variables to grid...
+  Interpolating wind_speed...
+    Range: [0.0022, 6.1555] | Mem: 21.5MB
+  Interpolating wind_dir_x...
+    Range: [-0.9540, 0.9998] | Mem: 21.5MB
+  Interpolating wind_dir_y...
+    Range: [-0.9994, 0.9968] | Mem: 21.5MB
+  Interpolating humidity...
+    Range: [29.4172, 99.8870] | Mem: 21.5MB
+  Interpolating precipitation...
+    Range: [0.0000, 8.4702] | Mem: 21.5MB
+
+[6/6] Normalizing and saving...
+Normalization completed
+Saved embedded data to: ../embedded_data/kma_weather_embedded.tif
+Bands: w_norm, d_x_norm, d_y_norm, rh_norm, r_norm
+File size: 16.56 MB
+Saved normalization stats to: ../embedded_data/kma_weather_norm_stats.json
+
+================================================================================
+KMA WEATHER EMBEDDING COMPLETE
+================================================================================
+✓ Processed 73 weather stations
+✓ Interpolated to 1645x1710 grid
+✓ Ready for next stage
+
+NOTE: Replace synthetic station locations with actual KMA station coordinates!

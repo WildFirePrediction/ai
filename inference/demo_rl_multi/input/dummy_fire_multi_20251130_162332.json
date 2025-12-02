@@ -1,0 +1,35 @@
+{
+  "fireShowInfoList": [
+    {
+      "frfrLctnXcrd": "128.35707832549647",
+      "frfrLctnYcrd": "36.941370251415854",
+      "frfrFrngDtm": "2025-11-30 16:23:32",
+      "frfrInfoId": "445226",
+      "frfrPrgrsStcd": "01",
+      "frfrPrgrsStcdNm": "진행중",
+      "frfrOccrrTpcd": "05",
+      "frfrStepIssuCd": "00",
+      "frfrStepIssuNm": "초기 대응",
+      "frfrPotfrRt": 100,
+      "frfrSttmnDt": "20251130",
+      "frfrSttmnHms": "162332",
+      "frfrOccrrStcd": "31",
+      "frfrSttmnLctnXcrd": "128.35707832549647",
+      "frfrSttmnLctnYcrd": "36.941370251415854",
+      "frfrSttmnAddr": "경상북도 Yeongju (위도: 36.9414, 경도: 128.3571)",
+      "frfrSttmnAddrDe": "경상북도 Yeongju 산림지역",
+      "potfrCmpleDtm": "2025-11-30 16:23:32",
+      "lgdngCd": "1598555",
+      "spread_points": [
+        {
+          "lat": 36.941370251415854,
+          "lon": 128.35347832549647
+        },
+        {
+          "lat": 36.937770251415856,
+          "lon": 128.35347832549647
+        }
+      ]
+    }
+  ]
+}

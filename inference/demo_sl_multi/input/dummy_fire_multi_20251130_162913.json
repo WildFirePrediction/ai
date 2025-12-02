@@ -1,0 +1,35 @@
+{
+  "fireShowInfoList": [
+    {
+      "frfrLctnXcrd": "128.63967484794796",
+      "frfrLctnYcrd": "36.30372341441546",
+      "frfrFrngDtm": "2025-11-30 16:29:13",
+      "frfrInfoId": "437803",
+      "frfrPrgrsStcd": "01",
+      "frfrPrgrsStcdNm": "진행중",
+      "frfrOccrrTpcd": "05",
+      "frfrStepIssuCd": "00",
+      "frfrStepIssuNm": "초기 대응",
+      "frfrPotfrRt": 100,
+      "frfrSttmnDt": "20251130",
+      "frfrSttmnHms": "162913",
+      "frfrOccrrStcd": "31",
+      "frfrSttmnLctnXcrd": "128.63967484794796",
+      "frfrSttmnLctnYcrd": "36.30372341441546",
+      "frfrSttmnAddr": "경상북도 Andong (위도: 36.3037, 경도: 128.6397)",
+      "frfrSttmnAddrDe": "경상북도 Andong 산림지역",
+      "potfrCmpleDtm": "2025-11-30 16:29:13",
+      "lgdngCd": "7105860",
+      "spread_points": [
+        {
+          "lat": 36.30732341441546,
+          "lon": 128.64327484794796
+        },
+        {
+          "lat": 36.30012341441546,
+          "lon": 128.63607484794795
+        }
+      ]
+    }
+  ]
+}

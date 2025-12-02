@@ -1,0 +1,35 @@
+{
+  "fireShowInfoList": [
+    {
+      "frfrLctnXcrd": "129.0156354248824",
+      "frfrLctnYcrd": "37.48854815637043",
+      "frfrFrngDtm": "2025-11-30 16:32:31",
+      "frfrInfoId": "496491",
+      "frfrPrgrsStcd": "01",
+      "frfrPrgrsStcdNm": "진행중",
+      "frfrOccrrTpcd": "05",
+      "frfrStepIssuCd": "00",
+      "frfrStepIssuNm": "초기 대응",
+      "frfrPotfrRt": 100,
+      "frfrSttmnDt": "20251130",
+      "frfrSttmnHms": "163231",
+      "frfrOccrrStcd": "31",
+      "frfrSttmnLctnXcrd": "129.0156354248824",
+      "frfrSttmnLctnYcrd": "37.48854815637043",
+      "frfrSttmnAddr": "경상북도 Gyeongsangbuk-do (위도: 37.4885, 경도: 129.0156)",
+      "frfrSttmnAddrDe": "경상북도 Gyeongsangbuk-do 산림지역",
+      "potfrCmpleDtm": "2025-11-30 16:32:31",
+      "lgdngCd": "7573357",
+      "spread_points": [
+        {
+          "lat": 37.48854815637043,
+          "lon": 129.0192354248824
+        },
+        {
+          "lat": 37.48494815637043,
+          "lon": 129.0156354248824
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "fire_id": "COMPARE_TEST",
+  "fire_location": {
+    "lat": 36.0657,
+    "lon": 128.9572
+  },
+  "fire_timestamp": "2025-11-29T20:53:06",
+  "inference_timestamp": "2025-11-29T20:56:27.550407",
+  "model": "unet_16ch_v3",
+  "predictions": [
+    {
+      "timestep": 1,
+      "timestamp": "2025-11-29T21:53:06",
+      "predicted_cells": [
+        {
+          "lat": 36.015046424361415,
+          "lon": 128.97659866301686,
+          "probability": 0.5065714120864868
+        },
+        {
+          "lat": 36.0149707046763,
+          "lon": 128.98118614174797,
+          "probability": 0.8371790647506714
+        },
+        {
+          "lat": 36.01124370514042,
+          "lon": 128.98109284092067,
+          "probability": 0.7150020003318787
+        }
+      ]
+    },
+    {
+      "timestep": 2,
+      "timestamp": "2025-11-29T22:53:06",
+      "predicted_cells": []
+    },
+    {
+      "timestep": 3,
+      "timestamp": "2025-11-29T23:53:06",
+      "predicted_cells": [
+        {
+          "lat": 36.0149707046763,
+          "lon": 128.98118614174797,
+          "probability": 0.5775139927864075
+        }
+      ]
+    }
+  ]
+}
