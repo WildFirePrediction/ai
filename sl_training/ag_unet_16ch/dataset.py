@@ -8,7 +8,6 @@ from torch.utils.data import Dataset, DataLoader
 from pathlib import Path
 import random
 
-
 class WildfireMultiTimestepDataset(Dataset):
     """
     Dataset for multi-timestep wildfire spread prediction
@@ -39,12 +38,10 @@ class WildfireMultiTimestepDataset(Dataset):
                 states = data['states']  # (T, 16, 30, 30)
                 T = len(states)
 
-                # Check MEL
                 mel = T - 1
                 if mel < min_mel:
                     continue
 
-                # Each timestep t (except last n_timesteps) is a sample
                 for t in range(T - n_timesteps):
                     self.samples.append((ep_file, t))
             except Exception as e:
