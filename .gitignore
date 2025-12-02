@@ -12,9 +12,6 @@ embedded_data
 tilling_data
 rl_training/supervised/checkpoints_unet/best_model
 wandb
-rl_training
-sl_training
-
 
 # files
 *.html
