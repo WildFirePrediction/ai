@@ -114,9 +114,12 @@ pip install -r requirements.txt
 
 
 ```
-# Outputs
-~/inference/demo_rl/outputs/*.json
-~/inference/demo_rl/outputs/*.html
+WildfirePrediction
+ └── inference/ 
+         └──demo_rl/
+               └──outputs/
+                     ├──*.html
+                     └──*.json
 ```
 
 
