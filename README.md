@@ -4,7 +4,6 @@
 
 This repository contains the AI components for a real-time wildfire spread prediction system, powered by geospatial data pipelines, reinforcement learning, and satellite-based fire detection feeds.
 
----
 
 ## Features
 
@@ -18,7 +17,6 @@ This repository contains the AI components for a real-time wildfire spread predi
 > 
 > - Systemd service deployment for background inference and 24/7 monitoring
 
----
 
 ## Project Layout
 
@@ -56,8 +54,6 @@ WildfirePrediction
 
 ```
 
----
-
 ## Quick Start
 
 ### 1) Clone the Repository
@@ -77,8 +73,6 @@ cd WildFirePrediction
 ```bash
 ./download_data.sh
 ```
-
----
 
 # Running the Wildfire Prediction
 
@@ -125,7 +119,6 @@ pip install -r requirements.txt
 ~/inference/demo_rl/outputs/*.html
 ```
 
----
 
 ## 2-2. Production Mode (Real KFS API Monitoring)
 
@@ -142,7 +135,6 @@ pip install -r requirements.txt
 EXTERNAL_BACKEND_URL = "https://api.example.com/wildfire/predictions"
 ```
 
----
 
 # Background Deployment (systemd)
 
@@ -168,7 +160,6 @@ sudo systemctl stop wildfire-api
 sudo systemctl stop wildfire-monitor
 ```
 
----
 
 ## Development Notes
 
