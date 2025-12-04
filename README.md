@@ -45,12 +45,12 @@ WildfirePrediction
  ├── embedding_src/             # Data embedding scripts
  ├── tilling_src/               # Environment tiling scripts
  │
- ├── README.md              # This file
- ├── requirements.txt       # Python dependencies
- ├── download_data.sh       # Data download script (~1.6GB)
- ├── install_env.sh         # CUDA + NVIDIA driver install script
- ├── start_demo.sh          # Start demo mode script
- └── start_monitoring.sh    # Start production monitoring mode script
+ ├── README.md                  # This file
+ ├── requirements.txt           # Python dependencies
+ ├── download_data.sh           # Data download script (~1.6GB)
+ ├── install_env.sh             # CUDA + NVIDIA driver install script
+ ├── start_demo.sh              # Start demo mode script
+ └── start_monitoring.sh        # Start production monitoring mode script
 
 ```
 
