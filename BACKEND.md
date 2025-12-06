@@ -6,36 +6,8 @@
 
 ## 📋 목차
 
-1. [백엔드 URL 설정](#백엔드-url-설정)
-2. [API 명세](#api-명세)
-3. [에러 처리](#에러-처리)
-
----
-
-## 백엔드 URL 설정
-
-> 백엔드 서버의 **URL이 확정되면 아래 위치에 URL 수정 PR 부탁드립니다**
-
-### 1. 설정 파일 수정
-
-`inference/fire_monitor/config.py` 파일을 열어 백엔드 URL을 수정하세요:
-
-```python
-# External Production Backend (TODO: Replace with actual URL)
-EXTERNAL_BACKEND_URL = "https://api.example.com/wildfire/predictions"
-```
-
-**수정 예시:**
-
-```python
-EXTERNAL_BACKEND_URL = "https://capstone6team1.com/api/v1/wildfire/predictions"
-```
-
-### 2. 주의사항
-
-- **HTTPS 권장**: 프로덕션 환경에서는 반드시 HTTPS를 사용하세요
-- **타임아웃**: 백엔드 응답 시간이 30초를 초과하면 타임아웃 처리됩니다
-- **재시도 없음**: 현재 버전에서는 백엔드 전송 실패 시 자동 재시도하지 않습니다
+1. [API 명세](#api-명세)
+2. [에러 처리](#에러-처리)
 
 ---
 
