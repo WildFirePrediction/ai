@@ -43,6 +43,7 @@ class KFSFireMonitor:
     """
     Monitors KFS API for active fires and sends them to inference server
     Supports both production (real KFS API) and demo (fake fires) modes
+    Tracks fire lifecycle: NEW -> ACTIVE -> ENDED
     """
 
     def __init__(self, poll_interval=KFS_POLL_INTERVAL, demo_mode=False):
@@ -56,6 +57,17 @@ class KFSFireMonitor:
         self.poll_interval = poll_interval
         self.demo_mode = demo_mode
         self.processed_fires = self._load_processed_fires()
+
+        # Track active fires with their metadata
+        # Format: {fire_id: {lat, lon, status, status_name, timestamp, last_seen_poll}}
+        self.active_fires = {}
+
+        # Demo mode: track when demo fires should end
+        self.demo_fire_end_times = {}  # {fire_id: poll_count_when_to_end}
+
+        # Status codes
+        self.ACTIVE_STATUS_CODES = ['01', '02']  # 01=진행중, 02=진화중
+        self.ENDED_STATUS_CODES = ['03']  # 03=진화완료 (Fire extinguished)
 
         # Create logs directory
         log_dir = Path("inference/fire_monitor/logs")
@@ -210,6 +222,69 @@ class KFSFireMonitor:
             print(f"  [ERROR] Failed to parse inference response: {e}")
             return None
 
+    def send_fire_ended_notification(self, fire_id, fire_metadata, reason):
+        """
+        Send fire ended notification to Flask server (which forwards to backend)
+
+        Args:
+            fire_id: Fire unique identifier
+            fire_metadata: Dict with fire location and other info
+            reason: Reason for ending (disappeared, status_changed, demo_timeout)
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            notification_data = {
+                'fire_id': fire_id,
+                'event_type': 'fire_ended',
+                'fire_location': {
+                    'lat': fire_metadata.get('lat'),
+                    'lon': fire_metadata.get('lon')
+                },
+                'fire_timestamp': fire_metadata.get('timestamp'),
+                'ended_timestamp': datetime.now().isoformat(),
+                'end_reason': reason,
+                'last_status': fire_metadata.get('status_name', 'unknown'),
+                'last_status_code': fire_metadata.get('status', 'unknown'),
+                'demo_mode': self.demo_mode
+            }
+
+            # Add official completion time if available (from KFS potfrCmpleDtm field)
+            if 'completion_timestamp' in fire_metadata:
+                notification_data['completion_timestamp'] = fire_metadata['completion_timestamp']
+
+            print(f"  [FIRE ENDED] {fire_id}")
+            print(f"    Reason: {reason}")
+            print(f"    Last location: {fire_metadata.get('lat'):.6f}°N, {fire_metadata.get('lon'):.6f}°E")
+            print(f"    Last status: {fire_metadata.get('status_name')}")
+
+            # Send to Flask server with fire_ended flag
+            response = requests.post(
+                FLASK_PREDICT_ENDPOINT,
+                json=notification_data,
+                timeout=30
+            )
+            response.raise_for_status()
+            result = response.json()
+
+            if result.get('success'):
+                print(f"  [SUCCESS] Fire ended notification sent to backend")
+                return True
+            else:
+                print(f"  [ERROR] Failed to send notification: {result.get('error', 'Unknown error')}")
+                return False
+
+        except requests.exceptions.Timeout:
+            print(f"  [ERROR] Timeout sending fire ended notification for {fire_id}")
+            return False
+        except requests.exceptions.RequestException as e:
+            print(f"  [ERROR] Failed to send fire ended notification: {e}")
+            return False
+        except Exception as e:
+            print(f"  [ERROR] Unexpected error sending notification: {e}")
+            return False
+
     def check_flask_server_health(self):
         """
         Check if Flask inference server is running
@@ -225,48 +300,123 @@ class KFSFireMonitor:
         except Exception:
             return False
 
-    def process_fires(self, fire_list):
+    def process_fires(self, fire_list, current_poll):
         """
         Process list of fires from KFS API
+        Tracks fire lifecycle: NEW -> ACTIVE -> ENDED
 
         Args:
             fire_list: List of fire dicts from KFS API
+            current_poll: Current poll iteration number
         """
         if not fire_list:
-            print(f"  No active fires")
-            return
+            print(f"  No fires in current API response")
 
-        print(f"  Found {len(fire_list)} fire(s) in KFS API")
+        # Step 1: Detect ended fires
+        current_fire_ids = set([f.get("frfrInfoId", "unknown") for f in fire_list])
+        ended_fires = []
+
+        for fire_id, fire_metadata in list(self.active_fires.items()):
+            ended = False
+            reason = None
+
+            # Check if fire disappeared from API
+            if fire_id not in current_fire_ids:
+                ended = True
+                reason = "disappeared_from_api"
+
+            # Check if status changed to ended code (for fires still in API)
+            elif fire_id in current_fire_ids:
+                current_fire = next((f for f in fire_list if f.get("frfrInfoId") == fire_id), None)
+                if current_fire:
+                    status_code = current_fire.get("frfrPrgrsStcd", "")
+                    if status_code in self.ENDED_STATUS_CODES:
+                        ended = True
+                        reason = f"status_changed_to_{status_code}"
+                        # Capture official completion time if available
+                        completion_time = current_fire.get("potfrCmpleDtm", "")
+                        if completion_time:
+                            fire_metadata['completion_timestamp'] = completion_time.replace(" ", "T")
+
+            # Demo mode: check if fire should end based on timer
+            if self.demo_mode and fire_id in self.demo_fire_end_times:
+                if current_poll >= self.demo_fire_end_times[fire_id]:
+                    ended = True
+                    reason = "demo_timeout"
+
+            if ended:
+                ended_fires.append((fire_id, fire_metadata, reason))
+
+        # Send fire ended notifications
+        for fire_id, fire_metadata, reason in ended_fires:
+            self.send_fire_ended_notification(fire_id, fire_metadata, reason)
+            # Remove from active fires
+            del self.active_fires[fire_id]
+            if fire_id in self.demo_fire_end_times:
+                del self.demo_fire_end_times[fire_id]
+
+        # Step 2: Process current fires
+        print(f"  Found {len(fire_list)} fire(s) in current response")
 
         for kfs_fire in fire_list:
             fire_id = kfs_fire.get("frfrInfoId", "unknown")
-
-            # Skip if already processed
-            if fire_id in self.processed_fires:
-                print(f"  Fire {fire_id}: Already processed, skipping")
-                continue
+            status_code = kfs_fire.get("frfrPrgrsStcd", "")
+            status_name = kfs_fire.get("frfrPrgrsStcdNm", "Unknown")
 
             # Convert to inference format
             fire_data = self.convert_kfs_to_inference_format(kfs_fire)
 
-            print(f"\n  [NEW FIRE] {fire_id}")
-            print(f"    Location: {fire_data['latitude']:.6f}°N, {fire_data['longitude']:.6f}°E")
-            print(f"    Timestamp: {fire_data['timestamp']}")
-            print(f"    Status: {fire_data['status']}")
+            # Check if this is a new fire
+            if fire_id not in self.processed_fires and fire_id not in self.active_fires:
+                # NEW FIRE - send to inference
+                print(f"\n  [NEW FIRE] {fire_id}")
+                print(f"    Location: {fire_data['latitude']:.6f}°N, {fire_data['longitude']:.6f}°E")
+                print(f"    Timestamp: {fire_data['timestamp']}")
+                print(f"    Status: {fire_data['status']}")
 
-            # Send to inference server
-            result = self.send_to_inference_server(fire_data)
+                # Send to inference server
+                result = self.send_to_inference_server(fire_data)
 
-            if result:
-                # Mark as processed
-                self.processed_fires.add(fire_id)
-                self._save_processed_fires()
+                if result:
+                    # Mark as processed and active
+                    self.processed_fires.add(fire_id)
+                    self._save_processed_fires()
 
-                # Log summary
-                num_predictions = len(result.get('predictions', []))
-                print(f"    Predictions: {num_predictions} timesteps generated")
+                    # Track as active fire
+                    self.active_fires[fire_id] = {
+                        'lat': fire_data['latitude'],
+                        'lon': fire_data['longitude'],
+                        'timestamp': fire_data['timestamp'],
+                        'status': status_code,
+                        'status_name': status_name,
+                        'last_seen_poll': current_poll
+                    }
+
+                    # Demo mode: schedule fire ending
+                    if self.demo_mode:
+                        # End fire after 2-3 poll cycles
+                        end_after = random.randint(2, 3)
+                        self.demo_fire_end_times[fire_id] = current_poll + end_after
+                        print(f"    [DEMO] Fire will end in {end_after} poll cycles")
+
+                    # Log summary
+                    num_predictions = len(result.get('predictions', []))
+                    print(f"    Predictions: {num_predictions} timesteps generated")
+                else:
+                    print(f"    Failed to get predictions")
+
+            elif fire_id in self.active_fires:
+                # EXISTING FIRE - update metadata
+                self.active_fires[fire_id].update({
+                    'status': status_code,
+                    'status_name': status_name,
+                    'last_seen_poll': current_poll
+                })
+                print(f"  Fire {fire_id}: Still active, status={status_name}")
+
             else:
-                print(f"    Failed to get predictions")
+                # Fire was processed before but ended, skip
+                pass
 
     def run(self):
         """
@@ -295,8 +445,8 @@ class KFSFireMonitor:
                 # Fetch fires from KFS API
                 fire_list = self.fetch_kfs_fires()
 
-                # Process fires
-                self.process_fires(fire_list)
+                # Process fires (pass current poll iteration)
+                self.process_fires(fire_list, iteration)
 
                 # Sleep until next poll
                 print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Sleeping for {self.poll_interval}s...")

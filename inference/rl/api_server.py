@@ -234,9 +234,9 @@ def health_check():
 def predict():
     """
     Main prediction endpoint
-    Receives fire data, runs inference, and optionally sends to external backend
+    Handles both fire predictions and fire ended notifications
 
-    Request JSON:
+    Request JSON (Fire Prediction):
         {
             "fire_id": "12345",
             "latitude": 36.5684,
@@ -245,55 +245,91 @@ def predict():
             "demo_mode": false  # Optional, default false
         }
 
+    Request JSON (Fire Ended):
+        {
+            "fire_id": "12345",
+            "event_type": "fire_ended",
+            "fire_location": {"lat": 36.5684, "lon": 128.7294},
+            "fire_timestamp": "2025-11-30T14:30:00",
+            "ended_timestamp": "2025-11-30T15:00:00",
+            "end_reason": "status_changed_to_03",
+            "last_status": "진화완료",
+            "demo_mode": false
+        }
+
     Response JSON:
         {
             "success": true,
             "fire_id": "12345",
-            "predictions": [...],
-            "sent_to_backend": true,
-            "demo_mode": false
+            "event_type": "fire_ended" | "prediction",
+            "sent_to_backend": true
         }
     """
     try:
-        if not inference_system:
-            return jsonify({
-                'success': False,
-                'error': 'Inference system not initialized'
-            }), 500
-
         # Get request data
         fire_data = request.get_json()
 
-        # Check demo mode
-        demo_mode = fire_data.pop('demo_mode', False)
+        # Check if this is a fire ended notification
+        event_type = fire_data.get('event_type', 'prediction')
+        demo_mode = fire_data.get('demo_mode', False)
 
-        # Validate required fields
-        required_fields = ['fire_id', 'latitude', 'longitude', 'timestamp']
-        for field in required_fields:
-            if field not in fire_data:
+        if event_type == 'fire_ended':
+            # FIRE ENDED NOTIFICATION - forward to backend without inference
+            fire_id = fire_data.get('fire_id', 'unknown')
+            print(f"\n[FIRE ENDED] Processing fire ended notification for {fire_id}")
+            print(f"  Reason: {fire_data.get('end_reason')}")
+            print(f"  Last status: {fire_data.get('last_status')}")
+
+            # Send to external backend only in production mode
+            backend_success = False
+            if not demo_mode and inference_system:
+                backend_success = inference_system.send_to_external_backend(fire_data)
+
+            return jsonify({
+                'success': True,
+                'fire_id': fire_id,
+                'event_type': 'fire_ended',
+                'sent_to_backend': backend_success,
+                'demo_mode': demo_mode,
+                'message': 'Fire ended notification processed'
+            })
+
+        else:
+            # FIRE PREDICTION - run inference
+            if not inference_system:
                 return jsonify({
                     'success': False,
-                    'error': f'Missing required field: {field}'
-                }), 400
+                    'error': 'Inference system not initialized'
+                }), 500
 
-        # Run inference (thread-safe)
-        with inference_lock:
-            result = inference_system.predict(fire_data, demo_mode=demo_mode)
+            # Validate required fields for prediction
+            required_fields = ['fire_id', 'latitude', 'longitude', 'timestamp']
+            for field in required_fields:
+                if field not in fire_data:
+                    return jsonify({
+                        'success': False,
+                        'error': f'Missing required field: {field}'
+                    }), 400
 
-        # Send to external backend only in production mode
-        backend_success = False
-        if not demo_mode:
-            backend_success = inference_system.send_to_external_backend(result)
+            # Run inference (thread-safe)
+            with inference_lock:
+                result = inference_system.predict(fire_data, demo_mode=demo_mode)
 
-        return jsonify({
-            'success': True,
-            'fire_id': result['fire_id'],
-            'predictions': result['predictions'],
-            'inference_timestamp': result['inference_timestamp'],
-            'sent_to_backend': backend_success,
-            'demo_mode': demo_mode,
-            'message': 'Prediction completed successfully'
-        })
+            # Send to external backend only in production mode
+            backend_success = False
+            if not demo_mode:
+                backend_success = inference_system.send_to_external_backend(result)
+
+            return jsonify({
+                'success': True,
+                'fire_id': result['fire_id'],
+                'event_type': 'prediction',
+                'predictions': result['predictions'],
+                'inference_timestamp': result['inference_timestamp'],
+                'sent_to_backend': backend_success,
+                'demo_mode': demo_mode,
+                'message': 'Prediction completed successfully'
+            })
 
     except Exception as e:
         traceback.print_exc()
