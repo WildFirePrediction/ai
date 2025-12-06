@@ -1,4 +1,6 @@
 import os
+from dotenv import load_dotenv
+load_dotenv()
 
 """ Directory paths """
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -16,8 +18,7 @@ NDVI_DATA_DIR = os.path.join(DATA_DIR, "NDVI")
 KFS_DATA_DIR = os.path.join(INFERENCE_DATA_DIR, "KFS")
 
 """ API KEYS"""
-# Read from environment variable KMA_API_KEY, or use hardcoded token as fallback
-KMA_WEATHER_TOKEN = os.getenv("KMA_API_KEY", "ud6z-X7yRDKes_l-8qQyFg")
+KMA_WEATHER_TOKEN = os.getenv("KMA_API_KEY")
 
 """ KMA API """
 KMA_AWS_BASE_URL = f"https://apihub.kma.go.kr/api/typ01/cgi-bin/url/nph-aws2_min?authKey={KMA_WEATHER_TOKEN}"

@@ -5,6 +5,7 @@
 .venv
 ._*
 .wandbignore
+.env
 
 # directories
 data
@@ -18,7 +19,6 @@ wandb
 __pycache__
 *.pyc
 sl_training/**/*.pt
-config.py
 
 # Project documentation (local only)
 AGENTS.md
