@@ -133,9 +133,9 @@ WildfirePrediction
 - Runs wildfire spread inference  
 - Sends results to production backend 
 
-```python
-# Configure backend URL in ~/inference/fire_monitor/config.py
-EXTERNAL_BACKEND_URL = "https://api.example.com/wildfire/predictions"
+```bash
+# Configure backend URL in .env
+EXTERNAL_BACKEND_URL=https://api.example.com/wildfire/predictions
 ```
 
 
