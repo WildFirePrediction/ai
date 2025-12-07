@@ -10,7 +10,7 @@ import subprocess
 from urllib.parse import quote
 
 PORT = 8080
-PROJECT_ROOT = Path(__file__).parent.resolve()
+PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 
 
 class HTMLFileHandler(http.server.SimpleHTTPRequestHandler):

@@ -125,7 +125,13 @@ class RLInferenceAPI:
         )
 
         static_channels = self.static_loader.extract_static_features(grid_bounds)
-        df_weather = fetch_kma_weather(fire_timestamp, kma_api_url)
+
+        # Use timestamp from 3 minutes ago (KMA API lags by 1-2 minutes)
+        from datetime import timedelta
+        weather_timestamp = fire_timestamp - timedelta(minutes=3)
+        print(f"  Using weather timestamp: {weather_timestamp.isoformat()} (3min lag)")
+
+        df_weather = fetch_kma_weather(weather_timestamp, kma_api_url)
         weather_channels = process_weather_data(df_weather, center_xy, grid_size=30)
         env_data = create_rl_input_tensor(static_channels, weather_channels)
         initial_fire_mask = create_initial_fire_mask(center_xy, grid_coords, grid_size=30)
