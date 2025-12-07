@@ -1,4 +1,5 @@
 import os
+
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -8,7 +9,7 @@ Configuration for Fire Monitoring System
 
 # KFS API (Korea Forest Service)
 KFS_REALTIME_URL = "https://fd.forest.go.kr/ffas/pubConn/selectPublicFireShowList.do"
-KFS_POLL_INTERVAL = 60
+KFS_POLL_INTERVAL = 30
 
 # Flask Inference Server (running on same machine)
 FLASK_SERVER_URL = "http://localhost:5000"
@@ -21,7 +22,8 @@ FLASK_HEALTH_ENDPOINT = f"{FLASK_SERVER_URL}/health"
 _backend_url_str = os.getenv("EXTERNAL_BACKEND_URL", "")
 if _backend_url_str:
     # Split by comma and strip whitespace
-    EXTERNAL_BACKEND_URLS = [url.strip() for url in _backend_url_str.split(",") if url.strip()]
+    EXTERNAL_BACKEND_URLS = [url.strip()
+                             for url in _backend_url_str.split(",") if url.strip()]
 else:
     EXTERNAL_BACKEND_URLS = []
 

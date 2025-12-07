@@ -91,6 +91,25 @@ class WildfireRLInferenceEngine:
             predictions: List of (30, 30) binary arrays for t+1, t+2, ..., t+N
                         Each array shows cumulative fire spread
         """
+        # Validate input data for NaN/inf values
+        if np.any(np.isnan(env_data)):
+            nan_count = np.sum(np.isnan(env_data))
+            nan_channels = np.where(np.any(np.isnan(env_data.reshape(16, -1)), axis=1))[0]
+            raise ValueError(f"env_data contains {nan_count} NaN values in channels: {nan_channels}")
+
+        if np.any(np.isinf(env_data)):
+            inf_count = np.sum(np.isinf(env_data))
+            inf_channels = np.where(np.any(np.isinf(env_data.reshape(16, -1)), axis=1))[0]
+            raise ValueError(f"env_data contains {inf_count} inf values in channels: {inf_channels}")
+
+        if np.any(np.isnan(initial_fire_mask)):
+            raise ValueError(f"initial_fire_mask contains NaN values")
+
+        # Print data ranges for debugging
+        print(f"  Data validation passed:")
+        print(f"    env_data shape: {env_data.shape}, range: [{env_data.min():.3f}, {env_data.max():.3f}]")
+        print(f"    fire_mask shape: {initial_fire_mask.shape}, range: [{initial_fire_mask.min():.3f}, {initial_fire_mask.max():.3f}]")
+
         # Convert to tensors
         env_tensor = torch.from_numpy(env_data).float().to(self.device)
         # Shape: (16, 30, 30)
