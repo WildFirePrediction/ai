@@ -22,27 +22,29 @@ PREREQUISITES:
     - start_monitoring.sh must be running (Flask server on port 5000)
     - External backend must be configured in .env (EXTERNAL_BACKEND_URL)
 """
-import sys
-from pathlib import Path
-import requests
-import json
 import argparse
 from datetime import datetime
+import json
+from pathlib import Path
 import random
+import sys
+
+import requests
+
+from generate_dummy_fire import GYEONGBUK_FIRE_ZONES, generate_random_fire
+from inference.fire_monitor.config import (
+    EXTERNAL_BACKEND_URLS,
+    FLASK_HEALTH_ENDPOINT,
+    FLASK_PREDICT_ENDPOINT,
+)
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
 sys.path.append(str(project_root))
 
-from inference.fire_monitor.config import (
-    FLASK_PREDICT_ENDPOINT,
-    FLASK_HEALTH_ENDPOINT,
-    EXTERNAL_BACKEND_URLS
-)
 
 # Import fake fire generator
 sys.path.insert(0, str(project_root / 'inference' / 'demo_rl' / 'src'))
-from generate_dummy_fire import generate_random_fire, GYEONGBUK_FIRE_ZONES
 
 
 def convert_kfs_to_inference_format(kfs_fire):
@@ -81,7 +83,8 @@ def generate_custom_fire(fire_id=None, lat=None, lon=None, use_known_zone=True):
     # Generate base fire
     if lat is None or lon is None:
         # Use generator to pick location
-        fire = generate_random_fire(fire_id=fire_id, use_known_zone=use_known_zone)
+        fire = generate_random_fire(
+            fire_id=fire_id, use_known_zone=use_known_zone)
     else:
         # Use custom location
         if fire_id is None:
@@ -93,7 +96,7 @@ def generate_custom_fire(fire_id=None, lat=None, lon=None, use_known_zone=True):
             "frfrLctnYcrd": str(lat),
             "frfrFrngDtm": timestamp.strftime("%Y-%m-%d %H:%M:%S"),
             "frfrInfoId": fire_id,
-            "frfrPrgrsStcd": "01",  # 01=ongoing
+            "frfrPrgrsStcd": "02",
             "frfrPrgrsStcdNm": "진행중",
             "frfrOccrrTpcd": "05",
             "frfrStepIssuCd": "00",
@@ -135,7 +138,7 @@ def generate_fire_ended_notification(fire_id, lat=None, lon=None, reason="demo_m
     timestamp = datetime.now()
 
     return {
-        'event_type': '1',  # 1 = fire ended
+        'event_type': '1',
         'fire_id': fire_id,
         'fire_location': {
             'lat': lat,
@@ -146,7 +149,7 @@ def generate_fire_ended_notification(fire_id, lat=None, lon=None, reason="demo_m
         'end_reason': reason,
         'last_status': '진행중',
         'last_status_code': '01',
-        'demo_mode': False  # False to test full pipeline
+        'demo_mode': False
     }
 
 
@@ -217,7 +220,8 @@ def print_fire_summary(fire_data, event_type='prediction'):
         print("DEMO FIRE INJECTION - NEW FIRE PREDICTION")
         print("="*70)
         print(f"Fire ID:    {fire_data.get('fire_id')}")
-        print(f"Location:   {fire_data.get('latitude'):.6f}N, {fire_data.get('longitude'):.6f}E")
+        print(
+            f"Location:   {fire_data.get('latitude'):.6f}N, {fire_data.get('longitude'):.6f}E")
         print(f"Timestamp:  {fire_data.get('timestamp')}")
         print(f"Status:     {fire_data.get('status', 'N/A')}")
     else:
@@ -302,7 +306,8 @@ Examples:
 
     # Show backend configuration
     if EXTERNAL_BACKEND_URLS:
-        print(f"\n[INFO] External backends configured: {len(EXTERNAL_BACKEND_URLS)}")
+        print(
+            f"\n[INFO] External backends configured: {len(EXTERNAL_BACKEND_URLS)}")
         for i, url in enumerate(EXTERNAL_BACKEND_URLS, 1):
             print(f"  {i}. {url}")
     else:
@@ -353,9 +358,12 @@ Examples:
                 backend_total = result.get('backend_total_count', 0)
 
                 print(f"\nInference Results:")
-                print(f"  - Predictions generated: {num_predictions} timesteps")
-                print(f"  - Inference timestamp: {result.get('inference_timestamp')}")
-                print(f"  - Backend delivery: {backend_success}/{backend_total} successful")
+                print(
+                    f"  - Predictions generated: {num_predictions} timesteps")
+                print(
+                    f"  - Inference timestamp: {result.get('inference_timestamp')}")
+                print(
+                    f"  - Backend delivery: {backend_success}/{backend_total} successful")
 
                 if backend_success > 0:
                     print(f"\n[OK] Data sent to external backend(s)")
@@ -368,7 +376,8 @@ Examples:
                 print(f"\nFire Ended Notification:")
                 backend_success = result.get('backend_success_count', 0)
                 backend_total = result.get('backend_total_count', 0)
-                print(f"  - Backend delivery: {backend_success}/{backend_total} successful")
+                print(
+                    f"  - Backend delivery: {backend_success}/{backend_total} successful")
 
                 if backend_success > 0:
                     print(f"\n[OK] Notification sent to external backend(s)")
