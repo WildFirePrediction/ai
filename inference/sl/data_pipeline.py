@@ -9,6 +9,7 @@ import requests
 import pandas as pd
 from datetime import datetime
 import sys
+import time
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
@@ -161,7 +162,7 @@ class StaticDataLoader:
 
 def fetch_kma_weather(timestamp, kma_api_url):
     """
-    Fetch weather data from KMA API
+    Fetch weather data from KMA API with retry logic
 
     Args:
         timestamp: datetime object or "YYYYMMDDHHMM" string
@@ -169,7 +170,7 @@ def fetch_kma_weather(timestamp, kma_api_url):
 
     Returns:
         df_weather: DataFrame with columns [STN, TA, HM, WS1, WD1, RN-15m, PA, TD]
-                    or None if request fails
+                    or None if all retries fail
     """
     if isinstance(timestamp, datetime):
         timestamp_str = timestamp.strftime("%Y%m%d%H%M")
@@ -178,61 +179,94 @@ def fetch_kma_weather(timestamp, kma_api_url):
 
     url = f"{kma_api_url}&tm2={timestamp_str}"
 
-    try:
-        response = requests.get(url, timeout=10)
-        response.encoding = 'euc-kr'
+    max_retries = 10
+    retry_interval = 15  # seconds
 
-        # Parse CSV (skip comment lines starting with #)
-        lines = response.text.split('\n')
+    for attempt in range(1, max_retries + 1):
+        try:
+            if attempt > 1:
+                print(f"[KMA API] Retry attempt {attempt}/{max_retries}...")
 
-        # Find header line
-        header_line = None
-        data_start_idx = None
-        for i, line in enumerate(lines):
-            if line.startswith('#') and 'YYMMDDHHMI' in line:
-                header_line = line.lstrip('#').strip()
-            elif not line.startswith('#') and line.strip() and header_line:
-                data_start_idx = i
-                break
+            response = requests.get(url, timeout=15)
+            response.encoding = 'euc-kr'
 
-        if not header_line or data_start_idx is None:
-            print(f"Failed to parse KMA response (no valid data)")
-            return None
+            # Parse CSV (skip comment lines starting with #)
+            lines = response.text.split('\n')
 
-        # Clean header
-        headers = [h.rstrip('.') for h in header_line.split()]
-        if headers[0].upper().startswith('YYMMDD'):
-            headers[0] = 'TIME'
+            # Find header line
+            header_line = None
+            data_start_idx = None
+            for i, line in enumerate(lines):
+                if line.startswith('#') and 'YYMMDDHHMI' in line:
+                    header_line = line.lstrip('#').strip()
+                elif not line.startswith('#') and line.strip() and header_line:
+                    data_start_idx = i
+                    break
 
-        # Parse data rows
-        data_rows = []
-        for line in lines[data_start_idx:]:
-            if not line.strip() or line.startswith('#'):
-                continue
-            parts = line.strip().split()
-            data_rows.append(parts)
+            if not header_line or data_start_idx is None:
+                print(f"Failed to parse KMA response (no valid data)")
+                if attempt < max_retries:
+                    print(f"Retrying in {retry_interval}s...")
+                    time.sleep(retry_interval)
+                    continue
+                return None
 
-        if not data_rows:
-            print(f"No data rows found in KMA response")
-            return None
+            # Clean header
+            headers = [h.rstrip('.') for h in header_line.split()]
+            if headers[0].upper().startswith('YYMMDD'):
+                headers[0] = 'TIME'
 
-        # Create DataFrame
-        df = pd.DataFrame(data_rows, columns=headers)
+            # Parse data rows
+            data_rows = []
+            for line in lines[data_start_idx:]:
+                if not line.strip() or line.startswith('#'):
+                    continue
+                parts = line.strip().split()
+                data_rows.append(parts)
 
-        # Convert numeric columns
-        numeric_cols = ['STN', 'TA', 'HM', 'WS1', 'WD1', 'RN-15m', 'PA', 'TD']
-        for col in numeric_cols:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce')
+            if not data_rows:
+                print(f"No data rows found in KMA response")
+                if attempt < max_retries:
+                    print(f"Retrying in {retry_interval}s...")
+                    time.sleep(retry_interval)
+                    continue
+                return None
 
-        # Replace missing values (-99, -99.9, -999) with NaN
-        df = df.replace([-99, -99.9, -999], np.nan)
+            # Create DataFrame
+            df = pd.DataFrame(data_rows, columns=headers)
 
-        return df
+            # Convert numeric columns
+            numeric_cols = ['STN', 'TA', 'HM', 'WS1', 'WD1', 'RN-15m', 'PA', 'TD']
+            for col in numeric_cols:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
 
-    except Exception as e:
-        print(f"Error fetching KMA weather: {e}")
-        return None
+            # Replace missing values (-99, -99.9, -999) with NaN
+            df = df.replace([-99, -99.9, -999], np.nan)
+
+            if attempt > 1:
+                print(f"[KMA API] Success after {attempt} attempts")
+
+            return df
+
+        except requests.exceptions.Timeout:
+            print(f"[KMA API] Timeout on attempt {attempt}/{max_retries}")
+            if attempt < max_retries:
+                print(f"Retrying in {retry_interval}s...")
+                time.sleep(retry_interval)
+            else:
+                print(f"[KMA API] All {max_retries} attempts failed")
+                return None
+        except Exception as e:
+            print(f"Error fetching KMA weather: {e}")
+            if attempt < max_retries:
+                print(f"Retrying in {retry_interval}s...")
+                time.sleep(retry_interval)
+            else:
+                print(f"[KMA API] All {max_retries} attempts failed")
+                return None
+
+    return None
 
 
 def process_weather_data(df_weather, center_xy, grid_size=30):
