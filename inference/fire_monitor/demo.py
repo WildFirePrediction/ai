@@ -22,29 +22,29 @@ PREREQUISITES:
     - start_monitoring.sh must be running (Flask server on port 5000)
     - External backend must be configured in .env (EXTERNAL_BACKEND_URL)
 """
+import sys
+from pathlib import Path
 import argparse
 from datetime import datetime
 import json
-from pathlib import Path
 import random
-import sys
 
 import requests
 
+# Add project root to path FIRST (before other imports)
+project_root = Path(__file__).parent.parent.parent
+sys.path.append(str(project_root))
+
+# Add demo_rl to path for generate_dummy_fire
+sys.path.insert(0, str(project_root / 'inference' / 'demo_rl' / 'src'))
+
+# Now import modules that depend on path modifications
 from generate_dummy_fire import GYEONGBUK_FIRE_ZONES, generate_random_fire
 from inference.fire_monitor.config import (
     EXTERNAL_BACKEND_URLS,
     FLASK_HEALTH_ENDPOINT,
     FLASK_PREDICT_ENDPOINT,
 )
-
-# Add project root to path
-project_root = Path(__file__).parent.parent.parent
-sys.path.append(str(project_root))
-
-
-# Import fake fire generator
-sys.path.insert(0, str(project_root / 'inference' / 'demo_rl' / 'src'))
 
 
 def convert_kfs_to_inference_format(kfs_fire):

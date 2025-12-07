@@ -144,6 +144,12 @@ class StaticDataLoader:
             ndvi = zoom(ndvi, zoom_factor, order=1)
             fsm = zoom(fsm, zoom_factor, order=0)  # Nearest neighbor for categorical
 
+        # Replace NaN values with defaults (handles missing data in rasters)
+        slope = np.nan_to_num(slope, nan=0.0)
+        aspect = np.nan_to_num(aspect, nan=0.0)
+        ndvi = np.nan_to_num(ndvi, nan=0.0)  # NDVI often has NaN for water/urban
+        fsm = np.nan_to_num(fsm, nan=1.0)  # Default to FSM class 1
+
         # One-hot encode FSM (4 classes: 1-4)
         fsm_onehot = np.zeros((4, 30, 30), dtype=np.float32)
         for class_idx in range(1, 5):
