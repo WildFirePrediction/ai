@@ -46,7 +46,7 @@ from config import KMA_AWS_BASE_URL
 
 # Import fire monitor config for external backend URL
 sys.path.insert(0, str(project_root / 'inference' / 'fire_monitor'))
-from inference.fire_monitor.config import EXTERNAL_BACKEND_URL, EXTERNAL_BACKEND_TIMEOUT
+from inference.fire_monitor.config import EXTERNAL_BACKEND_URL, EXTERNAL_BACKEND_URLS, EXTERNAL_BACKEND_TIMEOUT
 
 # Import visualization module from demo_rl
 sys.path.insert(0, str(project_root / 'inference' / 'demo_rl' / 'src'))
@@ -183,35 +183,55 @@ class RLInferenceAPI:
 
         return output_data
 
-    def send_to_external_backend(self, prediction_data, backend_url=EXTERNAL_BACKEND_URL):
+    def send_to_external_backend(self, prediction_data, backend_urls=None):
         """
-        Send prediction results to external production backend
+        Send prediction results to external production backend(s)
 
         Args:
             prediction_data: Dict with prediction results
-            backend_url: URL of external backend API
+            backend_urls: List of backend URLs (defaults to EXTERNAL_BACKEND_URLS from config)
 
         Returns:
-            bool: True if successful, False otherwise
+            dict: {'success_count': int, 'total': int, 'results': [bool, ...]}
         """
-        try:
-            print(f"\n[EXTERNAL] Sending predictions to backend: {backend_url}")
-            response = requests.post(
-                backend_url,
-                json=prediction_data,
-                timeout=EXTERNAL_BACKEND_TIMEOUT
-            )
-            response.raise_for_status()
+        if backend_urls is None:
+            backend_urls = EXTERNAL_BACKEND_URLS
 
-            print(f"  [SUCCESS] Backend received predictions (status {response.status_code})")
-            return True
+        if not backend_urls:
+            print("[EXTERNAL] No backend URLs configured")
+            return {'success_count': 0, 'total': 0, 'results': []}
 
-        except requests.exceptions.Timeout:
-            print(f"  [ERROR] Backend timeout after {EXTERNAL_BACKEND_TIMEOUT}s")
-            return False
-        except requests.exceptions.RequestException as e:
-            print(f"  [ERROR] Failed to send to backend: {e}")
-            return False
+        print(f"\n[EXTERNAL] Sending to {len(backend_urls)} backend(s)")
+        results = []
+
+        for i, backend_url in enumerate(backend_urls, 1):
+            try:
+                print(f"  [{i}/{len(backend_urls)}] Sending to: {backend_url}")
+                response = requests.post(
+                    backend_url,
+                    json=prediction_data,
+                    timeout=EXTERNAL_BACKEND_TIMEOUT
+                )
+                response.raise_for_status()
+
+                print(f"    [SUCCESS] Backend received data (status {response.status_code})")
+                results.append(True)
+
+            except requests.exceptions.Timeout:
+                print(f"    [ERROR] Timeout after {EXTERNAL_BACKEND_TIMEOUT}s")
+                results.append(False)
+            except requests.exceptions.RequestException as e:
+                print(f"    [ERROR] Failed: {e}")
+                results.append(False)
+
+        success_count = sum(results)
+        print(f"  [SUMMARY] {success_count}/{len(backend_urls)} backend(s) succeeded")
+
+        return {
+            'success_count': success_count,
+            'total': len(backend_urls),
+            'results': results
+        }
 
 
 # API Endpoints
@@ -283,15 +303,17 @@ def predict():
             print(f"  Last status: {fire_data.get('last_status')}")
 
             # Send to external backend only in production mode
-            backend_success = False
+            backend_result = {'success_count': 0, 'total': 0}
             if not demo_mode and inference_system:
-                backend_success = inference_system.send_to_external_backend(fire_data)
+                backend_result = inference_system.send_to_external_backend(fire_data)
 
             return jsonify({
                 'success': True,
                 'fire_id': fire_id,
                 'event_type': 'fire_ended',
-                'sent_to_backend': backend_success,
+                'sent_to_backend': backend_result['success_count'] > 0,
+                'backend_success_count': backend_result['success_count'],
+                'backend_total_count': backend_result['total'],
                 'demo_mode': demo_mode,
                 'message': 'Fire ended notification processed'
             })
@@ -318,9 +340,9 @@ def predict():
                 result = inference_system.predict(fire_data, demo_mode=demo_mode)
 
             # Send to external backend only in production mode
-            backend_success = False
+            backend_result = {'success_count': 0, 'total': 0}
             if not demo_mode:
-                backend_success = inference_system.send_to_external_backend(result)
+                backend_result = inference_system.send_to_external_backend(result)
 
             return jsonify({
                 'success': True,
@@ -328,7 +350,9 @@ def predict():
                 'event_type': 'prediction',
                 'predictions': result['predictions'],
                 'inference_timestamp': result['inference_timestamp'],
-                'sent_to_backend': backend_success,
+                'sent_to_backend': backend_result['success_count'] > 0,
+                'backend_success_count': backend_result['success_count'],
+                'backend_total_count': backend_result['total'],
                 'demo_mode': demo_mode,
                 'message': 'Prediction completed successfully'
             })
@@ -389,10 +413,15 @@ def main():
     print(f"\nRL Inference API Server")
     print(f"{'='*70}")
     print(f"Listening on http://{args.host}:{args.port}")
-    print(f"External Backend: {EXTERNAL_BACKEND_URL}")
+    if EXTERNAL_BACKEND_URLS:
+        print(f"External Backends ({len(EXTERNAL_BACKEND_URLS)}):")
+        for i, url in enumerate(EXTERNAL_BACKEND_URLS, 1):
+            print(f"  {i}. {url}")
+    else:
+        print(f"External Backend: Not configured")
     print(f"\nEndpoints:")
     print(f"  GET  /health   - Health check")
-    print(f"  POST /predict  - Run inference and forward to backend")
+    print(f"  POST /predict  - Run inference and forward to backend(s)")
     print(f"{'='*70}\n")
 
     app.run(
