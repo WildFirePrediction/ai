@@ -54,14 +54,15 @@ echo ""
 
 # Start KFS monitor
 echo "[2/2] Starting KFS Fire Monitor..."
-echo "  Poll interval: 300 seconds (5 minutes)"
+echo "  Poll interval: Using config.py setting (KFS_POLL_INTERVAL)"
 echo "  Press Ctrl+C to stop both services"
 echo ""
 echo "========================================"
 echo ""
 
 # Start monitor (will run in foreground)
-python inference/fire_monitor/kfs_monitor.py --poll-interval 300
+# No --poll-interval argument = uses KFS_POLL_INTERVAL from config.py
+python inference/fire_monitor/kfs_monitor.py
 
 # Cleanup: Kill Flask server when monitor stops
 echo ""
