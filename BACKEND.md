@@ -36,6 +36,7 @@ Content-Type: application/json
 
 ```json
 {
+  "event_type": "0",
   "fire_id": "12345",
   "fire_location": {
     "lat": 36.5684,
@@ -80,8 +81,8 @@ Content-Type: application/json
 
 ```json
 {
+  "event_type": "1",
   "fire_id": "12345",
-  "event_type": "fire_ended",
   "fire_location": {
     "lat": 36.5684,
     "lon": 128.7294
@@ -104,6 +105,7 @@ Content-Type: application/json
 
 | 필드 | 타입 | 설명 |
 |------|------|------|
+| `event_type` | string | 이벤트 타입: "0" (화재 예측), "1" (화재 종료) |
 | `fire_id` | string | 산림청 화재 고유 ID |
 | `fire_location` | object | 최초 발화 지점 좌표 |
 | `fire_location.lat` | float | 위도 (WGS84) |
@@ -128,7 +130,6 @@ Content-Type: application/json
 
 | 필드 | 타입 | 설명 |
 |------|------|------|
-| `event_type` | string | 이벤트 타입 (항상 "fire_ended") |
 | `ended_timestamp` | string | 화재 종료 감지 시각 (ISO 8601) |
 | `completion_timestamp` | string | 산림청 공식 진화 완료 시각 (선택적, ISO 8601) |
 | `end_reason` | string | 종료 이유 (아래 참조) |
@@ -196,8 +197,9 @@ Content-Type: application/json
 ### 백엔드에서 처리해야 할 사항
 
 1. **이벤트 타입 구분**
-   - `event_type` 필드가 있으면 화재 종료 알림
-   - `predictions` 필드가 있으면 화재 예측 데이터
+   - `event_type` 필드로 이벤트 타입 판별:
+     - `"0"`: 화재 예측 데이터 (predictions 필드 포함)
+     - `"1"`: 화재 종료 알림 (end_reason 필드 포함)
    - 두 가지 이벤트를 구분하여 처리해야 합니다
 
 2. **중복 요청 필터링**

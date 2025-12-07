@@ -157,6 +157,7 @@ class RLInferenceAPI:
         output_path = output_dir / output_filename
 
         output_data = {
+            'event_type': '0',  # 0 = inference prediction, 1 = fire ended
             'fire_id': str(fire_id),
             'fire_location': {
                 'lat': float(fire_lat),
@@ -238,6 +239,7 @@ def predict():
 
     Request JSON (Fire Prediction):
         {
+            "event_type": "0",  # 0 = inference, 1 = fire ended (optional, defaults to "0")
             "fire_id": "12345",
             "latitude": 36.5684,
             "longitude": 128.7294,
@@ -247,8 +249,8 @@ def predict():
 
     Request JSON (Fire Ended):
         {
+            "event_type": "1",  # 0 = inference, 1 = fire ended
             "fire_id": "12345",
-            "event_type": "fire_ended",
             "fire_location": {"lat": 36.5684, "lon": 128.7294},
             "fire_timestamp": "2025-11-30T14:30:00",
             "ended_timestamp": "2025-11-30T15:00:00",
@@ -261,7 +263,7 @@ def predict():
         {
             "success": true,
             "fire_id": "12345",
-            "event_type": "fire_ended" | "prediction",
+            "event_type": "0" | "1",  # 0 = prediction, 1 = fire ended
             "sent_to_backend": true
         }
     """
@@ -270,10 +272,10 @@ def predict():
         fire_data = request.get_json()
 
         # Check if this is a fire ended notification
-        event_type = fire_data.get('event_type', 'prediction')
+        event_type = fire_data.get('event_type', '0')  # Default to '0' (prediction)
         demo_mode = fire_data.get('demo_mode', False)
 
-        if event_type == 'fire_ended':
+        if event_type == '1':
             # FIRE ENDED NOTIFICATION - forward to backend without inference
             fire_id = fire_data.get('fire_id', 'unknown')
             print(f"\n[FIRE ENDED] Processing fire ended notification for {fire_id}")

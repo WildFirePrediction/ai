@@ -236,8 +236,8 @@ class KFSFireMonitor:
         """
         try:
             notification_data = {
+                'event_type': '1',  # 0 = inference prediction, 1 = fire ended
                 'fire_id': fire_id,
-                'event_type': 'fire_ended',
                 'fire_location': {
                     'lat': fire_metadata.get('lat'),
                     'lon': fire_metadata.get('lon')
@@ -368,6 +368,19 @@ class KFSFireMonitor:
 
             # Check if this is a new fire
             if fire_id not in self.processed_fires and fire_id not in self.active_fires:
+                # Check if fire is already extinguished using frfrPrgrsStcd field
+                if status_code in self.ENDED_STATUS_CODES:
+                    print(f"\n  [SKIPPED] Fire {fire_id} already extinguished")
+                    print(f"    Location: {fire_data['latitude']:.6f}°N, {fire_data['longitude']:.6f}°E")
+                    print(f"    Timestamp: {fire_data['timestamp']}")
+                    print(f"    Status: {status_name} (frfrPrgrsStcd={status_code})")
+                    print(f"    Reason: Fire detected with completed status, no prediction needed")
+
+                    # Mark as processed to avoid re-checking
+                    self.processed_fires.add(fire_id)
+                    self._save_processed_fires()
+                    continue
+
                 # NEW FIRE - send to inference
                 print(f"\n  [NEW FIRE] {fire_id}")
                 print(f"    Location: {fire_data['latitude']:.6f}°N, {fire_data['longitude']:.6f}°E")
