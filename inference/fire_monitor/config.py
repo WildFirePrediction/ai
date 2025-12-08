@@ -9,7 +9,7 @@ Configuration for Fire Monitoring System
 
 # KFS API (Korea Forest Service)
 KFS_REALTIME_URL = "https://fd.forest.go.kr/ffas/pubConn/selectPublicFireShowList.do"
-KFS_POLL_INTERVAL = 60
+KFS_POLL_INTERVAL = 300
 
 # Flask Inference Server (running on same machine)
 FLASK_SERVER_URL = "http://localhost:5000"
