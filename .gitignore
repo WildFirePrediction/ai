@@ -19,6 +19,12 @@ wandb
 __pycache__
 *.pyc
 sl_training/**/*.pt
+demo_multi.sh
+demo_spread.sh
+production_multi.sh
+production_spread.sh
+demofire.csv
+hf_upload.py
 
 # Project documentation (local only)
 AGENTS.md
