@@ -6,6 +6,7 @@ import torch
 import numpy as np
 from pathlib import Path
 import sys
+from rlconfig import TIMESTEPS
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
@@ -76,7 +77,7 @@ class WildfireRLInferenceEngine:
 
         return model
 
-    def predict_iterative(self, env_data, initial_fire_mask, num_timesteps=5):
+    def predict_iterative(self, env_data, initial_fire_mask, num_timesteps=TIMESTEPS):
         """
         Run iterative inference for multiple timesteps
 

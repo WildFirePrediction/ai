@@ -43,6 +43,7 @@ from inference.rl.grid_utils import (
 # Import config
 sys.path.insert(0, str(project_root / 'src'))
 from config import KMA_AWS_BASE_URL
+from rlconfig import TIMESTEPS
 
 # Import fire monitor config for external backend URL
 sys.path.insert(0, str(project_root / 'inference' / 'fire_monitor'))
@@ -139,7 +140,7 @@ class RLInferenceAPI:
         predictions = self.engine.predict_iterative(
             env_data=env_data,
             initial_fire_mask=initial_fire_mask,
-            num_timesteps=5
+            num_timesteps=TIMESTEPS
         )
 
         results = self.engine.process_predictions(
