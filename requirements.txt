@@ -43,7 +43,7 @@ seaborn>=0.12.0
 tqdm>=4.65.0
 
 # GDAL
-GDAL==3.8.4
+GDAL==3.13.0
 
 # Additional utilities
 python-dateutil>=2.8.0
