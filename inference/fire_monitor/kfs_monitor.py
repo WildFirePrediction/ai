@@ -154,7 +154,7 @@ class KFSFireMonitor:
             "frfrLctnYcrd": "36.5684",  # Latitude
             "frfrLctnXcrd": "128.7294",  # Longitude
             "frfrFrngDtm": "2025-12-02 14:30:00",
-            "frfrPrgrsStcd": "01",
+            "frfrPrgrsStcd": "02",
             "frfrPrgrsStcdNm": "진행중"
         }
 
