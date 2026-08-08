@@ -1,9 +1,10 @@
 # WildFirePrediction/ai
 
+![](screenshots/fire_spread.gif)
+
 #### AI Module for Real-Time Wildfire Spread Prediction
 
 This repository contains the AI components for a real-time wildfire spread prediction system, powered by geospatial data pipelines, reinforcement learning, and satellite-based fire detection feeds.
-
 
 ## Features
 
@@ -16,43 +17,6 @@ This repository contains the AI components for a real-time wildfire spread predi
 > - Demo mode with synthetic ignition events
 > 
 > - Systemd service deployment for background inference and 24/7 monitoring
-
-
-## Project Layout
-
-```
-WildfirePrediction
- ├── inference/
- │        ├──rl/                # RL model inference
- │        ├──sl/                # SL model inference 
- │        ├──demo_rl/           # Demo mode for RL model
- │        ├──demo_rl_multi/     # Demo mode for RL model (Multi-step)
- │        ├──demo_sl/           # Demo mode for SL model        
- │        ├──demo_sl_multi/     # Demo mode for SL model (Multi-step)
- │        └──fire_monitor/      # KFS API monitoring
- ├── rl_training/               # Reinforcement learning training
- │        ├──a3c_10ch/          # 10-channel A3C model
- │        ├──a3c_16ch/          # 16-channel A3C model (Production)
- │        └──...
- ├── sl_training/               # Supervised learning training
- │        ├──ag_unet_16ch/      # Spatial Attention U-Net model (Production)
- │        ├──unet_16ch/
- │        ├──unet_16ch_v2/
- │        ├──unet_16ch_v3/
- │        └──...
- ├── src/                       # Common utility scripts
- ├── deployment/                # systemd service files
- ├── embedding_src/             # Data embedding scripts
- ├── tilling_src/               # Environment tiling scripts
- │
- ├── README.md                  # This file
- ├── requirements.txt           # Python dependencies
- ├── download_data.sh           # Data download script (~1.6GB)
- ├── install_env.sh             # CUDA + NVIDIA driver install script
- ├── start_demo.sh              # Start demo mode script
- └── start_monitoring.sh        # Start production monitoring mode script
-
-```
 
 ## Quick Start
 
@@ -136,6 +100,28 @@ WildfirePrediction
 ```bash
 # Configure backend URL in .env
 EXTERNAL_BACKEND_URL=https://api.example.com/wildfire/predictions
+```
+
+
+## 2-3. Interactive Web Demo
+
+```bash
+./start_web.sh     # start engine + web server
+./stop_web.sh      # stop everything
+```
+
+- Browser UI on port `8080` (`--port` to change). The start script prints the Tailscale / LAN / local URLs.
+- Click anywhere on the map of South Korea to place one or more ignition points, set the ignition time and prediction horizon (10 min steps, up to 2 hours), then run inference.
+- Shows predicted spread per timestep on the 400m grid with a timeline player, plus live KMA weather, terrain and spread statistics per fire.
+- Saves a JSON result for every prediction.
+
+```
+WildfirePrediction
+ └── webdemo/
+        ├──server.py       # Flask app + JSON API
+        ├──engine.py       # RL inference wrapper
+        ├──static/         # map UI
+        └──outputs/*.json
 ```
 
 
