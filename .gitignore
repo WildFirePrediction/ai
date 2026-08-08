@@ -25,6 +25,7 @@ production_multi.sh
 production_spread.sh
 demofire.csv
 hf_upload.py
+inference/rl/outputs/api/*.json
 
 # Web demo: keep the UI source, ignore runtime artifacts
 !webdemo/static/**/*.html
