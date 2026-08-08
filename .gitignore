@@ -26,6 +26,12 @@ production_spread.sh
 demofire.csv
 hf_upload.py
 
+# Web demo: keep the UI source, ignore runtime artifacts
+!webdemo/static/**/*.html
+webdemo/logs
+webdemo/outputs
+webdemo/.webdemo.pid
+
 # Project documentation (local only)
 AGENTS.md
 PROGRESS.md

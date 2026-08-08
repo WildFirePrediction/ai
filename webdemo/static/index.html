@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Wildfire Spread Prediction - Interactive Demo</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ================= Sidebar ================= -->
+  <aside id="sidebar">
+
+    <header class="panel-header">
+      <div class="brand">
+        <span class="brand-mark"></span>
+        <div>
+          <h1>Wildfire Spread Prediction</h1>
+          <p class="brand-sub">A3C reinforcement learning inference engine</p>
+        </div>
+      </div>
+      <div id="engine-status" class="status status-loading">
+        <span class="status-dot"></span>
+        <span id="engine-status-text">Connecting to engine...</span>
+      </div>
+      <dl id="engine-meta" class="meta-grid">
+        <div><dt>Model</dt><dd id="meta-model">-</dd></div>
+        <div><dt>Device</dt><dd id="meta-device">-</dd></div>
+        <div><dt>Grid</dt><dd id="meta-grid">-</dd></div>
+        <div><dt>Step</dt><dd id="meta-step">-</dd></div>
+      </dl>
+    </header>
+
+    <div class="panel-scroll">
+
+      <!-- Ignition points -->
+      <section class="panel">
+        <div class="panel-title">
+          <h2>Ignition points</h2>
+          <span id="point-count" class="badge">0</span>
+        </div>
+        <p class="hint">Click anywhere on the map to place an ignition point. Drag a
+          marker to move it, click a marker to remove it.</p>
+        <ul id="point-list" class="point-list">
+          <li class="empty-note">No ignition points yet</li>
+        </ul>
+        <div class="row">
+          <select id="preset-select" class="control">
+            <option value="">Add example location...</option>
+          </select>
+        </div>
+      </section>
+
+      <!-- Scenario settings -->
+      <section class="panel">
+        <div class="panel-title"><h2>Scenario</h2></div>
+
+        <label class="field">
+          <span class="field-label">Ignition time</span>
+          <div class="row">
+            <input type="datetime-local" id="ignition-time" class="control">
+            <button id="btn-now" class="btn btn-ghost" title="Set to current time">Now</button>
+          </div>
+        </label>
+
+        <label class="field">
+          <span class="field-label">
+            Prediction horizon
+            <span id="horizon-label" class="field-value">t+30 min</span>
+          </span>
+          <input type="range" id="horizon" class="slider" min="1" max="12" step="1" value="3">
+        </label>
+
+        <label class="checkbox">
+          <input type="checkbox" id="show-grid" checked>
+          <span>Show model grid extent (12 x 12 km)</span>
+        </label>
+        <label class="checkbox">
+          <input type="checkbox" id="auto-fit" checked>
+          <span>Zoom to results when finished</span>
+        </label>
+      </section>
+
+      <!-- Actions -->
+      <section class="panel">
+        <div class="actions">
+          <button id="btn-run" class="btn btn-primary">Run prediction</button>
+          <button id="btn-clear-results" class="btn btn-ghost">Clear results</button>
+          <button id="btn-clear-points" class="btn btn-ghost">Clear points</button>
+          <button id="btn-export" class="btn btn-ghost" disabled>Export JSON</button>
+        </div>
+        <div id="progress" class="progress hidden">
+          <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
+          <span id="progress-text" class="progress-text">Running...</span>
+        </div>
+      </section>
+
+      <!-- Results -->
+      <section class="panel">
+        <div class="panel-title">
+          <h2>Results</h2>
+          <span id="result-count" class="badge">0</span>
+        </div>
+        <div id="summary" class="summary hidden">
+          <div class="stat"><span class="stat-value" id="stat-fires">0</span><span class="stat-label">fires</span></div>
+          <div class="stat"><span class="stat-value" id="stat-cells">0</span><span class="stat-label">cells</span></div>
+          <div class="stat"><span class="stat-value" id="stat-area">0</span><span class="stat-label">ha burned</span></div>
+          <div class="stat"><span class="stat-value" id="stat-runtime">0</span><span class="stat-label">ms compute</span></div>
+        </div>
+        <div id="result-list" class="result-list">
+          <p class="empty-note">Run a prediction to see spread statistics</p>
+        </div>
+      </section>
+
+      <footer class="panel-footer">
+        <p>Predictions are model output on 400 m cells at 10 minute steps and are
+          not an operational forecast.</p>
+      </footer>
+
+    </div>
+  </aside>
+
+  <!-- ================= Map ================= -->
+  <main id="map-wrap">
+    <div id="map"></div>
+
+    <!-- Legend -->
+    <div id="legend" class="map-card">
+      <h3>Spread timeline</h3>
+      <div class="legend-row"><span class="swatch swatch-origin"></span>Ignition point</div>
+      <div id="legend-steps"></div>
+    </div>
+
+    <!-- Timeline player -->
+    <div id="timeline" class="map-card timeline hidden">
+      <button id="btn-play" class="btn btn-icon" title="Play / pause (space)">
+        <span id="play-icon" class="icon-play"></span>
+      </button>
+      <input type="range" id="time-slider" class="slider" min="0" max="3" step="1" value="3">
+      <span id="time-label" class="time-label">t+30 min</span>
+    </div>
+
+    <!-- Busy overlay -->
+    <div id="overlay" class="overlay hidden">
+      <div class="overlay-card">
+        <div class="spinner"></div>
+        <p id="overlay-text">Running inference...</p>
+      </div>
+    </div>
+
+    <div id="toasts" class="toasts"></div>
+  </main>
+
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
